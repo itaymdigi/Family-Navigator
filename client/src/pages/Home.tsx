@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   CalendarDays, Hotel, Calculator, Image as ImageIcon,
   MapPin, ExternalLink, Navigation, Clock, Star, Users,
   ChevronDown, ChevronUp, Lightbulb, Camera, Trash2, Loader2,
-  Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi
+  Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi,
+  Filter, Maximize2
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { TripDay, DayEvent, Attraction, Accommodation, Photo, CurrencyRate, Tip, FamilyMember } from "@shared/schema";
-import { useEffect } from "react";
 
 function useOnlineStatus() {
   const [online, setOnline] = useState(navigator.onLine);
@@ -405,11 +405,25 @@ function PhotosView() {
   const [showAdd, setShowAdd] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
-  const [newPhoto, setNewPhoto] = useState({ url: "", caption: "", uploadedBy: null as number | null });
+  const [newPhoto, setNewPhoto] = useState({ url: "", caption: "", uploadedBy: null as number | null, category: "general" });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string>("הכל");
+
+  const categories = ["הכל", "נופים", "אוכל", "משפחה", "אטרקציות"];
+
+  const filteredPhotos = photos.filter(p => 
+    filterCategory === "הכל" || p.category === filterCategory
+  );
+
+  const resetForm = () => {
+    setNewPhoto({ url: "", caption: "", uploadedBy: null, category: "general" });
+    setSelectedFile(null);
+    setFilePreview(null);
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -419,12 +433,6 @@ function PhotosView() {
       reader.onload = () => setFilePreview(reader.result as string);
       reader.readAsDataURL(file);
     }
-  };
-
-  const resetForm = () => {
-    setNewPhoto({ url: "", caption: "", uploadedBy: null });
-    setSelectedFile(null);
-    setFilePreview(null);
   };
 
   const handleUpload = async () => {
@@ -441,6 +449,7 @@ function PhotosView() {
       const formData = new FormData();
       formData.append("photo", selectedFile);
       formData.append("caption", newPhoto.caption);
+      formData.append("category", newPhoto.category || "general");
       if (newPhoto.uploadedBy) formData.append("uploadedBy", String(newPhoto.uploadedBy));
       const res = await fetch("/api/photos/upload", { method: "POST", body: formData });
       if (!res.ok) throw new Error("Upload failed");
@@ -524,6 +533,19 @@ function PhotosView() {
                   </div>
                 )}
                 <div className="space-y-2">
+                  <Label>קטגוריה</Label>
+                  <Select value={newPhoto.category} onValueChange={(v) => setNewPhoto({ ...newPhoto, category: v })}>
+                    <SelectTrigger><SelectValue placeholder="בחר..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">כללי</SelectItem>
+                      <SelectItem value="נופים">נופים</SelectItem>
+                      <SelectItem value="אוכל">אוכל</SelectItem>
+                      <SelectItem value="משפחה">משפחה</SelectItem>
+                      <SelectItem value="אטרקציות">אטרקציות</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label>כיתוב</Label>
                   <Input placeholder="תיאור..." value={newPhoto.caption} onChange={(e) => setNewPhoto({ ...newPhoto, caption: e.target.value })} data-testid="input-photo-caption" />
                 </div>
@@ -548,8 +570,24 @@ function PhotosView() {
         </div>
       </div>
 
+      <div className="flex gap-2 overflow-x-auto pb-2 px-1 no-scrollbar mb-2">
+        {categories.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setFilterCategory(cat)}
+            className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${
+              filterCategory === cat 
+                ? "bg-primary text-white shadow-sm scale-105" 
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
       {members.length > 0 && (
-        <div className="flex gap-2 px-1 overflow-x-auto pb-1">
+        <div className="flex gap-2 px-1 overflow-x-auto pb-1 mb-2">
           {members.map((m) => (
             <div key={m.id} className="flex flex-col items-center gap-1 flex-shrink-0">
               <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: m.color }} data-testid={`member-avatar-${m.id}`}>
@@ -561,17 +599,22 @@ function PhotosView() {
         </div>
       )}
 
-      {photos.length === 0 ? (
+      {filteredPhotos.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <ImageIcon className="w-12 h-12 mx-auto mb-4 opacity-40" />
-          <p className="font-medium">אין תמונות עדיין</p>
+          <p className="font-medium">אין תמונות בקטגוריה זו</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          {photos.map((photo, i) => {
+          {filteredPhotos.map((photo, i) => {
             const member = getMemberName(photo.uploadedBy);
             return (
-              <div key={photo.id} className={`rounded-2xl overflow-hidden shadow-sm relative group cursor-pointer bg-muted ${i === 0 ? "col-span-2 aspect-video" : "aspect-square"}`} data-testid={`photo-${photo.id}`}>
+              <div 
+                key={photo.id} 
+                className={`rounded-2xl overflow-hidden shadow-sm relative group cursor-pointer bg-muted ${i % 5 === 0 ? "col-span-2 aspect-video" : "aspect-square"}`} 
+                data-testid={`photo-${photo.id}`}
+                onClick={() => setSelectedPhoto(photo)}
+              >
                 <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
                 {member && (
                   <div className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-sm" style={{ backgroundColor: member.color }}>
@@ -580,13 +623,39 @@ function PhotosView() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3">
                   <span className="text-white text-xs font-semibold">{photo.caption}</span>
-                  <button onClick={() => deleteMutation.mutate(photo.id)} className="text-white/80 hover:text-red-400 p-1" data-testid={`button-delete-photo-${photo.id}`}><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(photo.id); }} className="text-white/80 hover:text-red-400 p-1" data-testid={`button-delete-photo-${photo.id}`}><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
+        <DialogContent className="max-w-[100vw] h-[100vh] p-0 overflow-hidden border-none bg-black/95 flex flex-col items-center justify-center">
+          {selectedPhoto && (
+            <div className="relative w-full h-full flex flex-col items-center justify-center">
+              <img src={selectedPhoto.url} alt={selectedPhoto.caption} className="max-w-full max-h-[85vh] object-contain" />
+              <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white text-right">
+                <p className="font-bold text-xl mb-1">{selectedPhoto.caption}</p>
+                <div className="flex items-center gap-2 opacity-80 text-sm">
+                  {getMemberName(selectedPhoto.uploadedBy) && (
+                    <span>הועלה על ידי: {getMemberName(selectedPhoto.uploadedBy)?.name}</span>
+                  )}
+                  <span>•</span>
+                  <span>{selectedPhoto.category === "general" ? "כללי" : selectedPhoto.category}</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedPhoto(null)} 
+                className="absolute top-10 right-6 text-white/80 hover:text-white bg-white/10 backdrop-blur-md rounded-full p-2.5 z-50 transition-all hover:bg-white/20"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

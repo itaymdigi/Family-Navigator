@@ -88,6 +88,7 @@ export const photos = pgTable("photos", {
   url: text("url").notNull(),
   caption: text("caption").notNull(),
   uploadedBy: integer("uploaded_by"),
+  category: text("category").default("general").notNull(),
 });
 
 export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true });

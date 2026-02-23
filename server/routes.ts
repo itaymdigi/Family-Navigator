@@ -156,7 +156,8 @@ export async function registerRoutes(
       const url = `/uploads/${req.file.filename}`;
       const caption = req.body.caption || "";
       const uploadedBy = req.body.uploadedBy ? parseInt(req.body.uploadedBy) : null;
-      const photo = await storage.createPhoto({ url, caption, uploadedBy });
+      const category = req.body.category || "general";
+      const photo = await storage.createPhoto({ url, caption, uploadedBy, category });
       res.status(201).json(photo);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

@@ -75,7 +75,7 @@ export class DatabaseStorage implements IStorage {
   async updateAccommodation(id: number, acc: Partial<InsertAccommodation>) { const [r] = await db.update(accommodations).set(acc).where(eq(accommodations.id, id)).returning(); return r; }
   async deleteAccommodation(id: number) { await db.delete(accommodations).where(eq(accommodations.id, id)); }
 
-  async getPhotos() { return db.select().from(photos); }
+  async getPhotos() { return db.select().from(photos).orderBy(asc(photos.id)); }
   async createPhoto(photo: InsertPhoto) { const [r] = await db.insert(photos).values(photo).returning(); return r; }
   async deletePhoto(id: number) { await db.delete(photos).where(eq(photos.id, id)); }
 
