@@ -1,38 +1,72 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { eq } from "drizzle-orm";
+import { db } from "./db";
+import {
+  places, photos, currencyRates,
+  type Place, type InsertPlace,
+  type Photo, type InsertPhoto,
+  type CurrencyRate, type InsertCurrencyRate,
+} from "@shared/schema";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getPlaces(): Promise<Place[]>;
+  getPlace(id: number): Promise<Place | undefined>;
+  createPlace(place: InsertPlace): Promise<Place>;
+  deletePlace(id: number): Promise<void>;
+
+  getPhotos(): Promise<Photo[]>;
+  createPhoto(photo: InsertPhoto): Promise<Photo>;
+  deletePhoto(id: number): Promise<void>;
+
+  getCurrencyRates(): Promise<CurrencyRate[]>;
+  getCurrencyRate(id: number): Promise<CurrencyRate | undefined>;
+  createCurrencyRate(rate: InsertCurrencyRate): Promise<CurrencyRate>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
+export class DatabaseStorage implements IStorage {
+  async getPlaces(): Promise<Place[]> {
+    return db.select().from(places);
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async getPlace(id: number): Promise<Place | undefined> {
+    const [place] = await db.select().from(places).where(eq(places.id, id));
+    return place;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+  async createPlace(place: InsertPlace): Promise<Place> {
+    const [created] = await db.insert(places).values(place).returning();
+    return created;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async deletePlace(id: number): Promise<void> {
+    await db.delete(places).where(eq(places.id, id));
+  }
+
+  async getPhotos(): Promise<Photo[]> {
+    return db.select().from(photos);
+  }
+
+  async createPhoto(photo: InsertPhoto): Promise<Photo> {
+    const [created] = await db.insert(photos).values(photo).returning();
+    return created;
+  }
+
+  async deletePhoto(id: number): Promise<void> {
+    await db.delete(photos).where(eq(photos.id, id));
+  }
+
+  async getCurrencyRates(): Promise<CurrencyRate[]> {
+    return db.select().from(currencyRates);
+  }
+
+  async getCurrencyRate(id: number): Promise<CurrencyRate | undefined> {
+    const [rate] = await db.select().from(currencyRates).where(eq(currencyRates.id, id));
+    return rate;
+  }
+
+  async createCurrencyRate(rate: InsertCurrencyRate): Promise<CurrencyRate> {
+    const [created] = await db.insert(currencyRates).values(rate).returning();
+    return created;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
