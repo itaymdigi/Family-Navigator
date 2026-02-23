@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   CalendarDays, Hotel, Calculator, Image as ImageIcon,
   MapPin, ExternalLink, Navigation, Clock, Star, Users,
   ChevronDown, ChevronUp, Lightbulb, Camera, Trash2, Loader2,
-  Plus, Pencil, Map, X, Check
+  Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,9 +15,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { TripDay, DayEvent, Attraction, Accommodation, Photo, CurrencyRate, Tip, FamilyMember } from "@shared/schema";
+import { useEffect } from "react";
+
+function useOnlineStatus() {
+  const [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => { window.removeEventListener("online", handleOnline); window.removeEventListener("offline", handleOffline); };
+  }, []);
+  return online;
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("itinerary");
+  const isOnline = useOnlineStatus();
 
   return (
     <div className="min-h-screen bg-muted/50 flex justify-center selection:bg-primary/20" dir="rtl">
@@ -31,6 +45,12 @@ export default function Home() {
               </div>
               <p className="text-primary-foreground/90 text-sm font-medium">25.3 – 4.4.2026 · 11 ימים · 👨‍👩‍👦‍👦 4 נוסעים</p>
             </div>
+            {!isOnline && (
+              <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full" data-testid="offline-indicator">
+                <CloudOff className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-semibold">אופליין</span>
+              </div>
+            )}
           </div>
           <div className="flex gap-2 flex-wrap">
             {["🏔 שוויץ הבוהמית", "🪨 אדרשפאך", "🌲 גן עדן בוהמי", "🏰 טירות"].map((tag) => (
@@ -128,6 +148,12 @@ function DayCard({ day }: { day: TripDay }) {
             {day.rating && <RatingStars rating={day.rating} />}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {day.weatherIcon && (
+              <div className="flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+                <span className="text-lg leading-none">{day.weatherIcon}</span>
+                <span className="text-[10px] font-bold text-foreground/60">{day.weatherTemp}</span>
+              </div>
+            )}
             {day.mapsUrl && (
               <a href={day.mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-2 rounded-xl bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors" data-testid={`button-day-maps-${day.dayNumber}`}>
                 <Map className="w-4 h-4" />
@@ -139,6 +165,15 @@ function DayCard({ day }: { day: TripDay }) {
       </button>
       {expanded && (
         <div className="px-4 pb-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          {day.weatherIcon && (
+            <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2" data-testid={`weather-${day.dayNumber}`}>
+              <span className="text-2xl">{day.weatherIcon}</span>
+              <div>
+                <span className="font-bold text-sm text-blue-900">{day.weatherTemp}</span>
+                <span className="text-xs text-blue-700 mr-2"> · {day.weatherDesc}</span>
+              </div>
+            </div>
+          )}
           <div className="flex gap-2 justify-end">
             <button onClick={(e) => { e.stopPropagation(); deleteDay.mutate(); }} className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors" data-testid={`button-delete-day-${day.dayNumber}`}>
               <Trash2 className="w-3 h-3" /> מחק יום
@@ -369,12 +404,56 @@ function PhotosView() {
   const { data: members = [] } = useQuery<FamilyMember[]>({ queryKey: ["/api/family-members"] });
   const [showAdd, setShowAdd] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
   const [newPhoto, setNewPhoto] = useState({ url: "", caption: "", uploadedBy: null as number | null });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const addMutation = useMutation({
-    mutationFn: (photo: any) => apiRequest("POST", "/api/photos", photo),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/photos"] }); setShowAdd(false); setNewPhoto({ url: "", caption: "", uploadedBy: null }); },
-  });
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onload = () => setFilePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const resetForm = () => {
+    setNewPhoto({ url: "", caption: "", uploadedBy: null });
+    setSelectedFile(null);
+    setFilePreview(null);
+  };
+
+  const handleUpload = async () => {
+    if (uploadMode === "url") {
+      await apiRequest("POST", "/api/photos", newPhoto);
+      queryClient.invalidateQueries({ queryKey: ["/api/photos"] });
+      setShowAdd(false);
+      resetForm();
+      return;
+    }
+    if (!selectedFile || !newPhoto.caption) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("photo", selectedFile);
+      formData.append("caption", newPhoto.caption);
+      if (newPhoto.uploadedBy) formData.append("uploadedBy", String(newPhoto.uploadedBy));
+      const res = await fetch("/api/photos/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/photos"] });
+      setShowAdd(false);
+      resetForm();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/photos/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/photos"] }),
@@ -386,6 +465,8 @@ function PhotosView() {
     if (!id) return null;
     return members.find((m) => m.id === id);
   };
+
+  const canSave = uploadMode === "file" ? (!!selectedFile && !!newPhoto.caption) : (!!newPhoto.url && !!newPhoto.caption);
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
@@ -403,7 +484,7 @@ function PhotosView() {
               <FamilyMembersManager />
             </DialogContent>
           </Dialog>
-          <Dialog open={showAdd} onOpenChange={setShowAdd}>
+          <Dialog open={showAdd} onOpenChange={(o) => { setShowAdd(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" className="text-secondary hover:text-secondary hover:bg-secondary/10 rounded-full h-9 w-9" data-testid="button-add-photo">
                 <Camera className="w-4 h-4" strokeWidth={2.5} />
@@ -412,10 +493,36 @@ function PhotosView() {
             <DialogContent className="max-w-[90vw] rounded-2xl" dir="rtl">
               <DialogHeader><DialogTitle>הוספת תמונה</DialogTitle></DialogHeader>
               <div className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>קישור לתמונה</Label>
-                  <Input placeholder="https://..." value={newPhoto.url} onChange={(e) => setNewPhoto({ ...newPhoto, url: e.target.value })} data-testid="input-photo-url" dir="ltr" />
+                <div className="flex gap-2">
+                  <button onClick={() => setUploadMode("file")} className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${uploadMode === "file" ? "bg-secondary text-white" : "bg-muted text-muted-foreground"}`} data-testid="button-mode-file">
+                    <Upload className="w-3.5 h-3.5" /> מהמכשיר
+                  </button>
+                  <button onClick={() => setUploadMode("url")} className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${uploadMode === "url" ? "bg-secondary text-white" : "bg-muted text-muted-foreground"}`} data-testid="button-mode-url">
+                    <Link className="w-3.5 h-3.5" /> קישור URL
+                  </button>
                 </div>
+                {uploadMode === "file" ? (
+                  <div className="space-y-2">
+                    <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileSelect} className="hidden" data-testid="input-photo-file" />
+                    {filePreview ? (
+                      <div className="relative rounded-xl overflow-hidden h-48">
+                        <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
+                        <button onClick={() => { setSelectedFile(null); setFilePreview(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="absolute top-2 left-2 bg-black/50 text-white rounded-full p-1.5"><X className="w-4 h-4" /></button>
+                      </div>
+                    ) : (
+                      <button onClick={() => fileInputRef.current?.click()} className="w-full h-36 border-2 border-dashed border-muted-foreground/30 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-secondary/50 hover:bg-secondary/5 transition-colors" data-testid="button-select-file">
+                        <Camera className="w-8 h-8 text-muted-foreground/40" />
+                        <span className="text-sm text-muted-foreground font-medium">לחצו לצלם או לבחור תמונה</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>קישור לתמונה</Label>
+                    <Input placeholder="https://..." value={newPhoto.url} onChange={(e) => setNewPhoto({ ...newPhoto, url: e.target.value })} data-testid="input-photo-url" dir="ltr" />
+                    {newPhoto.url && <div className="rounded-xl overflow-hidden h-40"><img src={newPhoto.url} alt="Preview" className="w-full h-full object-cover" /></div>}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>כיתוב</Label>
                   <Input placeholder="תיאור..." value={newPhoto.caption} onChange={(e) => setNewPhoto({ ...newPhoto, caption: e.target.value })} data-testid="input-photo-caption" />
@@ -432,9 +539,8 @@ function PhotosView() {
                     </Select>
                   </div>
                 )}
-                {newPhoto.url && <div className="rounded-xl overflow-hidden h-40"><img src={newPhoto.url} alt="Preview" className="w-full h-full object-cover" /></div>}
-                <Button className="w-full rounded-xl bg-secondary hover:bg-secondary/90" onClick={() => addMutation.mutate(newPhoto)} disabled={!newPhoto.url || !newPhoto.caption || addMutation.isPending} data-testid="button-save-photo">
-                  {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null} שמירה
+                <Button className="w-full rounded-xl bg-secondary hover:bg-secondary/90" onClick={handleUpload} disabled={!canSave || uploading} data-testid="button-save-photo">
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Upload className="w-4 h-4 ml-2" />} שמירה
                 </Button>
               </div>
             </DialogContent>

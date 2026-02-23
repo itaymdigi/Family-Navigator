@@ -12,6 +12,9 @@ export const tripDays = pgTable("trip_days", {
   rating: integer("rating"),
   mapsUrl: text("maps_url"),
   notes: json("notes").$type<string[]>(),
+  weatherIcon: text("weather_icon"),
+  weatherTemp: text("weather_temp"),
+  weatherDesc: text("weather_desc"),
 });
 
 export const insertTripDaySchema = createInsertSchema(tripDays).omit({ id: true });

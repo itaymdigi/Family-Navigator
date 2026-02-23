@@ -9,6 +9,28 @@ import {
   tripDays, dayEvents, attractions, accommodations, tips,
 } from "@shared/schema";
 import OpenAI from "openai";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import express from "express";
+
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only image files allowed"));
+  },
+});
 
 const openrouter = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENROUTER_BASE_URL,
@@ -40,7 +62,8 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  // Trip Days CRUD
+  app.use("/uploads", express.static(uploadsDir));
+
   app.get("/api/trip-days", async (_req, res) => { res.json(await storage.getTripDays()); });
   app.post("/api/trip-days", async (req, res) => {
     const p = insertTripDaySchema.safeParse(req.body);
@@ -59,7 +82,6 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  // Day Events CRUD
   app.get("/api/trip-days/:id/events", async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(400).json({ message: "Invalid id" });
@@ -82,7 +104,6 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  // Attractions CRUD
   app.get("/api/trip-days/:id/attractions", async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(400).json({ message: "Invalid id" });
@@ -105,7 +126,6 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  // Accommodations CRUD
   app.get("/api/accommodations", async (_req, res) => { res.json(await storage.getAccommodations()); });
   app.post("/api/accommodations", async (req, res) => {
     const p = insertAccommodationSchema.safeParse(req.body);
@@ -124,24 +144,39 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  // Photos CRUD
   app.get("/api/photos", async (_req, res) => { res.json(await storage.getPhotos()); });
   app.post("/api/photos", async (req, res) => {
     const p = insertPhotoSchema.safeParse(req.body);
     if (!p.success) return res.status(400).json({ message: p.error.message });
     res.status(201).json(await storage.createPhoto(p.data));
   });
+  app.post("/api/photos/upload", upload.single("photo"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const url = `/uploads/${req.file.filename}`;
+      const caption = req.body.caption || "";
+      const uploadedBy = req.body.uploadedBy ? parseInt(req.body.uploadedBy) : null;
+      const photo = await storage.createPhoto({ url, caption, uploadedBy });
+      res.status(201).json(photo);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
   app.delete("/api/photos/:id", async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(400).json({ message: "Invalid id" });
+    const photos = await storage.getPhotos();
+    const photo = photos.find((p) => p.id === id);
+    if (photo && photo.url.startsWith("/uploads/")) {
+      const filePath = path.join(process.cwd(), photo.url);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
     await storage.deletePhoto(id);
     res.status(204).send();
   });
 
-  // Currency rates
   app.get("/api/currency-rates", async (_req, res) => { res.json(await storage.getCurrencyRates()); });
 
-  // Tips CRUD
   app.get("/api/tips", async (_req, res) => { res.json(await storage.getTips()); });
   app.post("/api/tips", async (req, res) => {
     const p = insertTipSchema.safeParse(req.body);
@@ -160,7 +195,6 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  // Family Members CRUD
   app.get("/api/family-members", async (_req, res) => { res.json(await storage.getFamilyMembers()); });
   app.post("/api/family-members", async (req, res) => {
     const p = insertFamilyMemberSchema.safeParse(req.body);
@@ -179,7 +213,6 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  // AI Chat
   app.post("/api/chat", async (req, res) => {
     try {
       const { messages } = req.body;
