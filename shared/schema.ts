@@ -1,6 +1,7 @@
-import { pgTable, text, serial, integer, real, boolean, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, real, boolean, json, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { sql } from "drizzle-orm";
 
 export const tripDays = pgTable("trip_days", {
   id: serial("id").primaryKey(),
@@ -68,10 +69,22 @@ export const insertAccommodationSchema = createInsertSchema(accommodations).omit
 export type InsertAccommodation = z.infer<typeof insertAccommodationSchema>;
 export type Accommodation = typeof accommodations.$inferSelect;
 
+export const familyMembers = pgTable("family_members", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  avatar: text("avatar"),
+  color: text("color").notNull(),
+});
+
+export const insertFamilyMemberSchema = createInsertSchema(familyMembers).omit({ id: true });
+export type InsertFamilyMember = z.infer<typeof insertFamilyMemberSchema>;
+export type FamilyMember = typeof familyMembers.$inferSelect;
+
 export const photos = pgTable("photos", {
   id: serial("id").primaryKey(),
   url: text("url").notNull(),
   caption: text("caption").notNull(),
+  uploadedBy: integer("uploaded_by"),
 });
 
 export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true });
@@ -100,3 +113,25 @@ export const tips = pgTable("tips", {
 export const insertTipSchema = createInsertSchema(tips).omit({ id: true });
 export type InsertTip = z.infer<typeof insertTipSchema>;
 export type Tip = typeof tips.$inferSelect;
+
+export const conversations = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull(),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true });
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;

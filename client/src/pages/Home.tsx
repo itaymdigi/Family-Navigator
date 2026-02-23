@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   CalendarDays, Hotel, Calculator, Image as ImageIcon,
-  MapPin, ExternalLink, Navigation, Clock, Star,
+  MapPin, ExternalLink, Navigation, Clock, Star, Users,
   ChevronDown, ChevronUp, Lightbulb, Camera, Trash2, Loader2,
-  ArrowRightLeft, Map
+  Plus, Pencil, Map, X, Check
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { TripDay, DayEvent, Attraction, Accommodation, Photo, CurrencyRate, Tip } from "@shared/schema";
+import type { TripDay, DayEvent, Attraction, Accommodation, Photo, CurrencyRate, Tip, FamilyMember } from "@shared/schema";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("itinerary");
@@ -31,7 +32,6 @@ export default function Home() {
               <p className="text-primary-foreground/90 text-sm font-medium">25.3 – 4.4.2026 · 11 ימים · 👨‍👩‍👦‍👦 4 נוסעים</p>
             </div>
           </div>
-          
           <div className="flex gap-2 flex-wrap">
             {["🏔 שוויץ הבוהמית", "🪨 אדרשפאך", "🌲 גן עדן בוהמי", "🏰 טירות"].map((tag) => (
               <span key={tag} className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-semibold">{tag}</span>
@@ -59,17 +59,12 @@ export default function Home() {
   );
 }
 
-function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) {
+function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode; label: string; isActive: boolean; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      data-testid={`nav-${label}`}
-      className={`flex flex-col items-center gap-1 transition-all duration-300 ease-out flex-1 ${isActive ? 'text-primary scale-105' : 'text-muted-foreground hover:text-foreground'}`}
-    >
-      <div className={`${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground'} p-2 rounded-2xl transition-colors duration-300`}>
-        {icon}
-      </div>
-      <span className={`text-[10px] font-semibold ${isActive ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
+    <button onClick={onClick} data-testid={`nav-${label}`}
+      className={`flex flex-col items-center gap-1 transition-all duration-300 ease-out flex-1 ${isActive ? "text-primary scale-105" : "text-muted-foreground hover:text-foreground"}`}>
+      <div className={`${isActive ? "bg-primary/10 text-primary" : "text-muted-foreground"} p-2 rounded-2xl transition-colors duration-300`}>{icon}</div>
+      <span className={`text-[10px] font-semibold ${isActive ? "opacity-100" : "opacity-70"}`}>{label}</span>
     </button>
   );
 }
@@ -78,32 +73,52 @@ function RatingStars({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
       {Array.from({ length: 5 }).map((_, i) => (
-        <Star key={i} className={`w-3.5 h-3.5 ${i < rating ? 'fill-accent text-accent' : 'text-muted-foreground/30'}`} />
+        <Star key={i} className={`w-3.5 h-3.5 ${i < rating ? "fill-accent text-accent" : "text-muted-foreground/30"}`} />
       ))}
+    </div>
+  );
+}
+
+function EditableField({ value, onSave, type = "text", className = "" }: { value: string; onSave: (v: string) => void; type?: string; className?: string }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value);
+  if (!editing) return <span onClick={() => setEditing(true)} className={`cursor-pointer hover:bg-primary/5 rounded px-1 -mx-1 transition-colors ${className}`}>{value}</span>;
+  return (
+    <div className="flex items-center gap-1">
+      <Input type={type} value={val} onChange={(e) => setVal(e.target.value)} className="h-7 text-xs" autoFocus onKeyDown={(e) => { if (e.key === "Enter") { onSave(val); setEditing(false); } if (e.key === "Escape") setEditing(false); }} />
+      <button onClick={() => { onSave(val); setEditing(false); }} className="text-success"><Check className="w-4 h-4" /></button>
+      <button onClick={() => setEditing(false)} className="text-muted-foreground"><X className="w-4 h-4" /></button>
     </div>
   );
 }
 
 function DayCard({ day }: { day: TripDay }) {
   const [expanded, setExpanded] = useState(false);
-  const { data: events = [] } = useQuery<DayEvent[]>({
-    queryKey: ["/api/trip-days", String(day.id), "events"],
-    enabled: expanded,
+  const { data: events = [] } = useQuery<DayEvent[]>({ queryKey: ["/api/trip-days", String(day.id), "events"], enabled: expanded });
+  const { data: dayAttractions = [] } = useQuery<Attraction[]>({ queryKey: ["/api/trip-days", String(day.id), "attractions"], enabled: expanded });
+
+  const updateDay = useMutation({
+    mutationFn: (data: any) => apiRequest("PATCH", `/api/trip-days/${day.id}`, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trip-days"] }),
   });
-  const { data: dayAttractions = [] } = useQuery<Attraction[]>({
-    queryKey: ["/api/trip-days", String(day.id), "attractions"],
-    enabled: expanded,
+  const deleteDay = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/trip-days/${day.id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trip-days"] }),
+  });
+  const deleteEvent = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/day-events/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trip-days", String(day.id), "events"] }),
+  });
+  const deleteAttr = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/attractions/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trip-days", String(day.id), "attractions"] }),
   });
 
   return (
     <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white overflow-hidden" data-testid={`day-card-${day.dayNumber}`}>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full text-right"
-        data-testid={`button-expand-day-${day.dayNumber}`}
-      >
+      <button onClick={() => setExpanded(!expanded)} className="w-full text-right" data-testid={`button-expand-day-${day.dayNumber}`}>
         <CardContent className="p-4 flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold ${day.dayNumber === 0 || day.dayNumber === 10 ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
+          <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold ${day.dayNumber === 0 || day.dayNumber === 10 ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
             <span className="text-[10px] leading-none font-semibold">יום</span>
             <span className="text-lg leading-none">{day.dayNumber}</span>
           </div>
@@ -114,14 +129,7 @@ function DayCard({ day }: { day: TripDay }) {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {day.mapsUrl && (
-              <a
-                href={day.mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="p-2 rounded-xl bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors"
-                data-testid={`button-day-maps-${day.dayNumber}`}
-              >
+              <a href={day.mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-2 rounded-xl bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors" data-testid={`button-day-maps-${day.dayNumber}`}>
                 <Map className="w-4 h-4" />
               </a>
             )}
@@ -129,9 +137,13 @@ function DayCard({ day }: { day: TripDay }) {
           </div>
         </CardContent>
       </button>
-
       {expanded && (
         <div className="px-4 pb-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex gap-2 justify-end">
+            <button onClick={(e) => { e.stopPropagation(); deleteDay.mutate(); }} className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors" data-testid={`button-delete-day-${day.dayNumber}`}>
+              <Trash2 className="w-3 h-3" /> מחק יום
+            </button>
+          </div>
           {day.notes && (day.notes as string[]).length > 0 && (
             <div className="space-y-2">
               {(day.notes as string[]).map((note, i) => (
@@ -142,32 +154,32 @@ function DayCard({ day }: { day: TripDay }) {
               ))}
             </div>
           )}
-
           {events.length > 0 && (
             <div className="relative">
               <div className="absolute right-[19px] top-2 bottom-2 w-0.5 bg-border"></div>
               <div className="space-y-3">
                 {events.map((event) => (
-                  <div key={event.id} className="flex gap-3 items-start relative" data-testid={`event-${event.id}`}>
-                    <div className="w-10 text-left flex-shrink-0">
-                      <span className="text-[11px] font-bold text-primary">{event.time}</span>
-                    </div>
+                  <div key={event.id} className="flex gap-3 items-start relative group" data-testid={`event-${event.id}`}>
+                    <div className="w-10 text-left flex-shrink-0"><span className="text-[11px] font-bold text-primary">{event.time}</span></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-primary border-2 border-white shadow-sm mt-1 flex-shrink-0 z-10"></div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm text-foreground">{event.title}</p>
                       {event.description && <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>}
                     </div>
+                    <button onClick={() => deleteEvent.mutate(event.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-event-${event.id}`}>
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
           )}
-
+          <AddEventForm dayId={day.id} />
           {dayAttractions.length > 0 && (
             <div className="space-y-3 pt-2">
               <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">אטרקציות</h4>
               {dayAttractions.map((attr) => (
-                <AttractionCard key={attr.id} attraction={attr} />
+                <AttractionCard key={attr.id} attraction={attr} dayId={day.id} onDelete={() => deleteAttr.mutate(attr.id)} />
               ))}
             </div>
           )}
@@ -177,13 +189,48 @@ function DayCard({ day }: { day: TripDay }) {
   );
 }
 
-function AttractionCard({ attraction }: { attraction: Attraction }) {
+function AddEventForm({ dayId }: { dayId: number }) {
+  const [open, setOpen] = useState(false);
+  const [time, setTime] = useState("");
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const mutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/day-events", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trip-days", String(dayId), "events"] });
+      setOpen(false); setTime(""); setTitle(""); setDesc("");
+    },
+  });
+  if (!open) return (
+    <button onClick={() => setOpen(true)} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 py-1" data-testid={`button-add-event-${dayId}`}>
+      <Plus className="w-3 h-3" /> הוסף אירוע
+    </button>
+  );
   return (
-    <div className="bg-muted/40 rounded-xl p-3 space-y-2.5" data-testid={`attraction-${attraction.id}`}>
+    <div className="bg-muted/30 rounded-xl p-3 space-y-2 animate-in fade-in duration-200">
+      <div className="flex gap-2">
+        <Input placeholder="שעה" value={time} onChange={(e) => setTime(e.target.value)} className="w-20 h-8 text-xs" dir="ltr" data-testid={`input-event-time-${dayId}`} />
+        <Input placeholder="כותרת" value={title} onChange={(e) => setTitle(e.target.value)} className="flex-1 h-8 text-xs" data-testid={`input-event-title-${dayId}`} />
+      </div>
+      <Input placeholder="תיאור (אופציונלי)" value={desc} onChange={(e) => setDesc(e.target.value)} className="h-8 text-xs" data-testid={`input-event-desc-${dayId}`} />
+      <div className="flex gap-2">
+        <Button size="sm" className="h-7 text-xs rounded-lg bg-primary" onClick={() => mutation.mutate({ dayId, time, title, description: desc || null, sortOrder: 99 })} disabled={!time || !title || mutation.isPending} data-testid={`button-save-event-${dayId}`}>
+          {mutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "שמור"}
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 text-xs rounded-lg" onClick={() => setOpen(false)}>ביטול</Button>
+      </div>
+    </div>
+  );
+}
+
+function AttractionCard({ attraction, dayId, onDelete }: { attraction: Attraction; dayId: number; onDelete: () => void }) {
+  return (
+    <div className="bg-muted/40 rounded-xl p-3 space-y-2.5 group relative" data-testid={`attraction-${attraction.id}`}>
+      <button onClick={onDelete} className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1.5 bg-white/80 rounded-lg transition-opacity z-10" data-testid={`button-delete-attr-${attraction.id}`}>
+        <Trash2 className="w-3 h-3" />
+      </button>
       {attraction.image && (
-        <div className="h-28 rounded-lg overflow-hidden">
-          <img src={attraction.image} alt={attraction.name} className="w-full h-full object-cover" />
-        </div>
+        <div className="h-28 rounded-lg overflow-hidden"><img src={attraction.image} alt={attraction.name} className="w-full h-full object-cover" /></div>
       )}
       <div>
         <h5 className="font-bold text-sm">{attraction.name}</h5>
@@ -199,16 +246,12 @@ function AttractionCard({ attraction }: { attraction: Attraction }) {
       <div className="flex gap-2">
         {attraction.mapsUrl && (
           <a href={attraction.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-maps-${attraction.id}`}>
-            <Button size="sm" className="w-full rounded-lg bg-secondary hover:bg-secondary/90 text-white text-xs h-8 gap-1.5">
-              <Navigation className="w-3 h-3" /> Google Maps
-            </Button>
+            <Button size="sm" className="w-full rounded-lg bg-secondary hover:bg-secondary/90 text-white text-xs h-8 gap-1.5"><Navigation className="w-3 h-3" /> Google Maps</Button>
           </a>
         )}
         {attraction.wazeUrl && (
           <a href={attraction.wazeUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-waze-${attraction.id}`}>
-            <Button size="sm" variant="outline" className="w-full rounded-lg text-xs h-8 gap-1.5">
-              <ExternalLink className="w-3 h-3" /> Waze
-            </Button>
+            <Button size="sm" variant="outline" className="w-full rounded-lg text-xs h-8 gap-1.5"><ExternalLink className="w-3 h-3" /> Waze</Button>
           </a>
         )}
       </div>
@@ -218,35 +261,23 @@ function AttractionCard({ attraction }: { attraction: Attraction }) {
 
 function ItineraryView() {
   const { data: days = [], isLoading } = useQuery<TripDay[]>({ queryKey: ["/api/trip-days"] });
-
-  if (isLoading) {
-    return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-  }
-
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   return (
     <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
       <h2 className="text-lg font-bold text-foreground tracking-tight px-1">📅 מסלול יום-יומי</h2>
-      {days.map((day) => (
-        <DayCard key={day.id} day={day} />
-      ))}
+      {days.map((day) => <DayCard key={day.id} day={day} />)}
     </div>
   );
 }
 
 function HotelsView() {
   const { data: hotels = [], isLoading } = useQuery<Accommodation[]>({ queryKey: ["/api/accommodations"] });
-
-  if (isLoading) {
-    return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-  }
-
-  const grouped = hotels.reduce((acc, h) => {
-    const base = h.baseName || "אחר";
-    if (!acc[base]) acc[base] = [];
-    acc[base].push(h);
-    return acc;
-  }, {} as Record<string, Accommodation[]>);
-
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/accommodations/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/accommodations"] }),
+  });
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  const grouped = hotels.reduce((acc, h) => { const b = h.baseName || "אחר"; if (!acc[b]) acc[b] = []; acc[b].push(h); return acc; }, {} as Record<string, Accommodation[]>);
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
       <h2 className="text-lg font-bold text-foreground tracking-tight px-1">🏨 לינה</h2>
@@ -254,7 +285,7 @@ function HotelsView() {
         <div key={baseName} className="space-y-3">
           <h3 className="text-sm font-bold text-foreground/80 px-1">{baseName}</h3>
           {hotels.map((hotel) => (
-            <Card key={hotel.id} className={`border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white overflow-hidden ${hotel.isSelected ? 'ring-2 ring-success/50' : ''}`} data-testid={`hotel-card-${hotel.id}`}>
+            <Card key={hotel.id} className={`border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white overflow-hidden group ${hotel.isSelected ? "ring-2 ring-success/50" : ""}`} data-testid={`hotel-card-${hotel.id}`}>
               <CardContent className="p-4 space-y-3">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
@@ -262,36 +293,20 @@ function HotelsView() {
                       <h4 className="font-bold text-sm">{hotel.name}</h4>
                       {hotel.isSelected && <span className="bg-success/20 text-success-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">✅ הוזמן</span>}
                     </div>
-                    <div className="flex gap-0.5 mt-1">
-                      {Array.from({ length: hotel.stars }).map((_, i) => (
-                        <Star key={i} className="w-3 h-3 fill-accent text-accent" />
-                      ))}
-                    </div>
+                    <div className="flex gap-0.5 mt-1">{Array.from({ length: hotel.stars }).map((_, i) => <Star key={i} className="w-3 h-3 fill-accent text-accent" />)}</div>
                   </div>
-                  {hotel.priceRange && (
-                    <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg">{hotel.priceRange}</span>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {hotel.priceRange && <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg">{hotel.priceRange}</span>}
+                    <button onClick={() => deleteMutation.mutate(hotel.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-hotel-${hotel.id}`}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{hotel.description}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>{hotel.dates}</span>
-                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="w-3.5 h-3.5" /><span>{hotel.dates}</span></div>
                 <div className="flex gap-2">
-                  {hotel.mapsUrl && (
-                    <a href={hotel.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-hotel-maps-${hotel.id}`}>
-                      <Button size="sm" className="w-full rounded-lg bg-secondary hover:bg-secondary/90 text-white text-xs h-8 gap-1.5">
-                        <Navigation className="w-3 h-3" /> Maps
-                      </Button>
-                    </a>
-                  )}
-                  {hotel.wazeUrl && (
-                    <a href={hotel.wazeUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-hotel-waze-${hotel.id}`}>
-                      <Button size="sm" variant="outline" className="w-full rounded-lg text-xs h-8 gap-1.5">
-                        <ExternalLink className="w-3 h-3" /> Waze
-                      </Button>
-                    </a>
-                  )}
+                  {hotel.mapsUrl && <a href={hotel.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-hotel-maps-${hotel.id}`}><Button size="sm" className="w-full rounded-lg bg-secondary hover:bg-secondary/90 text-white text-xs h-8 gap-1.5"><Navigation className="w-3 h-3" /> Maps</Button></a>}
+                  {hotel.wazeUrl && <a href={hotel.wazeUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-hotel-waze-${hotel.id}`}><Button size="sm" variant="outline" className="w-full rounded-lg text-xs h-8 gap-1.5"><ExternalLink className="w-3 h-3" /> Waze</Button></a>}
                 </div>
               </CardContent>
             </Card>
@@ -306,85 +321,43 @@ function CurrencyView() {
   const { data: rates = [] } = useQuery<CurrencyRate[]>({ queryKey: ["/api/currency-rates"] });
   const [amount, setAmount] = useState("100");
   const [fromCurrency, setFromCurrency] = useState("CZK");
-
   const filteredRates = rates.filter((r) => r.fromCurrency === fromCurrency);
-
-  const quickAmounts = fromCurrency === "CZK"
-    ? [50, 100, 200, 500, 1000, 2000]
-    : fromCurrency === "EUR"
-    ? [5, 10, 20, 50, 100, 200]
-    : [10, 20, 50, 100, 200, 500];
-
+  const quickAmounts = fromCurrency === "CZK" ? [50, 100, 200, 500, 1000, 2000] : fromCurrency === "EUR" ? [5, 10, 20, 50, 100, 200] : [10, 20, 50, 100, 200, 500];
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
       <h2 className="text-lg font-bold text-foreground tracking-tight px-1">💱 מחשבון המרה</h2>
-
       <div className="flex gap-2 px-1">
         {["CZK", "EUR", "ILS"].map((cur) => (
-          <button
-            key={cur}
-            onClick={() => { setFromCurrency(cur); setAmount("100"); }}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${fromCurrency === cur ? 'bg-primary text-white shadow-sm' : 'bg-muted text-muted-foreground'}`}
-            data-testid={`button-currency-${cur}`}
-          >
+          <button key={cur} onClick={() => { setFromCurrency(cur); setAmount("100"); }} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${fromCurrency === cur ? "bg-primary text-white shadow-sm" : "bg-muted text-muted-foreground"}`} data-testid={`button-currency-${cur}`}>
             {cur === "CZK" ? "🇨🇿 CZK" : cur === "EUR" ? "🇪🇺 EUR" : "🇮🇱 ILS"}
           </button>
         ))}
       </div>
-
       <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] bg-white rounded-2xl">
         <CardContent className="p-5 space-y-5">
           <div className="space-y-2">
             <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">סכום</Label>
             <div className="flex items-center gap-3 bg-muted/50 p-3 rounded-xl">
               <span className="text-lg font-bold">{fromCurrency}</span>
-              <Input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="border-none shadow-none bg-transparent text-left text-2xl font-bold tracking-tight focus-visible:ring-0 px-2"
-                dir="ltr"
-                data-testid="input-currency-amount"
-              />
+              <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="border-none shadow-none bg-transparent text-left text-2xl font-bold tracking-tight focus-visible:ring-0 px-2" dir="ltr" data-testid="input-currency-amount" />
             </div>
           </div>
-
           <div className="flex flex-wrap gap-2">
             {quickAmounts.map((qa) => (
-              <button
-                key={qa}
-                onClick={() => setAmount(String(qa))}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${Number(amount) === qa ? 'bg-primary text-white' : 'bg-muted/60 text-foreground/70 hover:bg-muted'}`}
-                data-testid={`button-quick-${qa}`}
-              >
-                {qa.toLocaleString()}
-              </button>
+              <button key={qa} onClick={() => setAmount(String(qa))} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${Number(amount) === qa ? "bg-primary text-white" : "bg-muted/60 text-foreground/70 hover:bg-muted"}`} data-testid={`button-quick-${qa}`}>{qa.toLocaleString()}</button>
             ))}
           </div>
-
           {filteredRates.length > 0 && (
             <div className="space-y-3 pt-2">
               {filteredRates.map((r) => (
                 <div key={r.id} className="flex items-center justify-between p-3 bg-success/10 rounded-xl" data-testid={`rate-result-${r.id}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{r.flag}</span>
-                    <div>
-                      <p className="text-xs text-muted-foreground">1 {r.fromCurrency} = {r.rate} {r.toCurrency}</p>
-                    </div>
-                  </div>
-                  <div className="text-left">
-                    <p className="font-bold text-lg" dir="ltr">{(Number(amount) * r.rate).toFixed(2)}</p>
-                    <p className="text-[10px] text-muted-foreground font-medium">{r.toCurrency}</p>
-                  </div>
+                  <div className="flex items-center gap-2"><span className="text-xl">{r.flag}</span><p className="text-xs text-muted-foreground">1 {r.fromCurrency} = {r.rate} {r.toCurrency}</p></div>
+                  <div className="text-left"><p className="font-bold text-lg" dir="ltr">{(Number(amount) * r.rate).toFixed(2)}</p><p className="text-[10px] text-muted-foreground font-medium">{r.toCurrency}</p></div>
                 </div>
               ))}
             </div>
           )}
-
-          <p className="text-[10px] text-center text-muted-foreground pt-2">
-            שער המרה משוער – מומלץ לבדוק שער עדכני לפני הטיול.
-            כמעט בכל מקום בצ'כיה מקבלים כרטיסי אשראי.
-          </p>
+          <p className="text-[10px] text-center text-muted-foreground pt-2">שער המרה משוער – מומלץ לבדוק שער עדכני לפני הטיול. כמעט בכל מקום בצ'כיה מקבלים כרטיסי אשראי.</p>
         </CardContent>
       </Card>
     </div>
@@ -393,63 +366,94 @@ function CurrencyView() {
 
 function PhotosView() {
   const { data: photos = [], isLoading } = useQuery<Photo[]>({ queryKey: ["/api/photos"] });
+  const { data: members = [] } = useQuery<FamilyMember[]>({ queryKey: ["/api/family-members"] });
   const [showAdd, setShowAdd] = useState(false);
-  const [newPhoto, setNewPhoto] = useState({ url: "", caption: "" });
+  const [showMembers, setShowMembers] = useState(false);
+  const [newPhoto, setNewPhoto] = useState({ url: "", caption: "", uploadedBy: null as number | null });
 
   const addMutation = useMutation({
-    mutationFn: (photo: typeof newPhoto) => apiRequest("POST", "/api/photos", photo),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/photos"] });
-      setShowAdd(false);
-      setNewPhoto({ url: "", caption: "" });
-    },
+    mutationFn: (photo: any) => apiRequest("POST", "/api/photos", photo),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/photos"] }); setShowAdd(false); setNewPhoto({ url: "", caption: "", uploadedBy: null }); },
   });
-
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/photos/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/photos"] }),
   });
 
-  if (isLoading) {
-    return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>;
-  }
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>;
+
+  const getMemberName = (id: number | null) => {
+    if (!id) return null;
+    return members.find((m) => m.id === id);
+  };
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
       <div className="flex justify-between items-center px-1">
         <h2 className="text-lg font-bold text-foreground tracking-tight">📸 גלריית הטיול</h2>
-        <Dialog open={showAdd} onOpenChange={setShowAdd}>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-secondary hover:text-secondary hover:bg-secondary/10 rounded-full h-9 w-9" data-testid="button-add-photo">
-              <Camera className="w-4 h-4" strokeWidth={2.5} />
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-[90vw] rounded-2xl" dir="rtl">
-            <DialogHeader>
-              <DialogTitle>הוספת תמונה</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="space-y-2">
-                <Label>קישור לתמונה</Label>
-                <Input placeholder="https://..." value={newPhoto.url} onChange={(e) => setNewPhoto({ ...newPhoto, url: e.target.value })} data-testid="input-photo-url" dir="ltr" />
-              </div>
-              <div className="space-y-2">
-                <Label>כיתוב</Label>
-                <Input placeholder="תיאור..." value={newPhoto.caption} onChange={(e) => setNewPhoto({ ...newPhoto, caption: e.target.value })} data-testid="input-photo-caption" />
-              </div>
-              {newPhoto.url && (
-                <div className="rounded-xl overflow-hidden h-40">
-                  <img src={newPhoto.url} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-              <Button className="w-full rounded-xl bg-secondary hover:bg-secondary/90" onClick={() => addMutation.mutate(newPhoto)} disabled={!newPhoto.url || !newPhoto.caption || addMutation.isPending} data-testid="button-save-photo">
-                {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
-                שמירה
+        <div className="flex gap-1">
+          <Dialog open={showMembers} onOpenChange={setShowMembers}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-primary hover:text-primary hover:bg-primary/10 rounded-full h-9 w-9" data-testid="button-manage-members">
+                <Users className="w-4 h-4" strokeWidth={2.5} />
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="max-w-[90vw] rounded-2xl" dir="rtl">
+              <DialogHeader><DialogTitle>בני משפחה</DialogTitle></DialogHeader>
+              <FamilyMembersManager />
+            </DialogContent>
+          </Dialog>
+          <Dialog open={showAdd} onOpenChange={setShowAdd}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-secondary hover:text-secondary hover:bg-secondary/10 rounded-full h-9 w-9" data-testid="button-add-photo">
+                <Camera className="w-4 h-4" strokeWidth={2.5} />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[90vw] rounded-2xl" dir="rtl">
+              <DialogHeader><DialogTitle>הוספת תמונה</DialogTitle></DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label>קישור לתמונה</Label>
+                  <Input placeholder="https://..." value={newPhoto.url} onChange={(e) => setNewPhoto({ ...newPhoto, url: e.target.value })} data-testid="input-photo-url" dir="ltr" />
+                </div>
+                <div className="space-y-2">
+                  <Label>כיתוב</Label>
+                  <Input placeholder="תיאור..." value={newPhoto.caption} onChange={(e) => setNewPhoto({ ...newPhoto, caption: e.target.value })} data-testid="input-photo-caption" />
+                </div>
+                {members.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>מי העלה?</Label>
+                    <Select value={newPhoto.uploadedBy ? String(newPhoto.uploadedBy) : "none"} onValueChange={(v) => setNewPhoto({ ...newPhoto, uploadedBy: v === "none" ? null : Number(v) })}>
+                      <SelectTrigger data-testid="select-photo-uploader"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">ללא</SelectItem>
+                        {members.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {newPhoto.url && <div className="rounded-xl overflow-hidden h-40"><img src={newPhoto.url} alt="Preview" className="w-full h-full object-cover" /></div>}
+                <Button className="w-full rounded-xl bg-secondary hover:bg-secondary/90" onClick={() => addMutation.mutate(newPhoto)} disabled={!newPhoto.url || !newPhoto.caption || addMutation.isPending} data-testid="button-save-photo">
+                  {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null} שמירה
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+
+      {members.length > 0 && (
+        <div className="flex gap-2 px-1 overflow-x-auto pb-1">
+          {members.map((m) => (
+            <div key={m.id} className="flex flex-col items-center gap-1 flex-shrink-0">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: m.color }} data-testid={`member-avatar-${m.id}`}>
+                {m.avatar || m.name[0]}
+              </div>
+              <span className="text-[10px] text-muted-foreground font-medium">{m.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {photos.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
@@ -458,72 +462,145 @@ function PhotosView() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          {photos.map((photo, i) => (
-            <div key={photo.id} className={`rounded-2xl overflow-hidden shadow-sm relative group cursor-pointer bg-muted ${i === 0 ? 'col-span-2 aspect-video' : 'aspect-square'}`} data-testid={`photo-${photo.id}`}>
-              <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3">
-                <span className="text-white text-xs font-semibold">{photo.caption}</span>
-                <button onClick={() => deleteMutation.mutate(photo.id)} className="text-white/80 hover:text-red-400 p-1" data-testid={`button-delete-photo-${photo.id}`}>
-                  <Trash2 className="w-4 h-4" />
-                </button>
+          {photos.map((photo, i) => {
+            const member = getMemberName(photo.uploadedBy);
+            return (
+              <div key={photo.id} className={`rounded-2xl overflow-hidden shadow-sm relative group cursor-pointer bg-muted ${i === 0 ? "col-span-2 aspect-video" : "aspect-square"}`} data-testid={`photo-${photo.id}`}>
+                <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
+                {member && (
+                  <div className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-sm" style={{ backgroundColor: member.color }}>
+                    {member.avatar || member.name[0]}
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3">
+                  <span className="text-white text-xs font-semibold">{photo.caption}</span>
+                  <button onClick={() => deleteMutation.mutate(photo.id)} className="text-white/80 hover:text-red-400 p-1" data-testid={`button-delete-photo-${photo.id}`}><Trash2 className="w-4 h-4" /></button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
+function FamilyMembersManager() {
+  const { data: members = [] } = useQuery<FamilyMember[]>({ queryKey: ["/api/family-members"] });
+  const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState("");
+  const colors = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#6C5CE7", "#FD79A8", "#00B894", "#E17055"];
+  const [color, setColor] = useState(colors[0]);
+
+  const addMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/family-members", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/family-members"] }); setName(""); setAvatar(""); },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/family-members/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/family-members"] }),
+  });
+
+  return (
+    <div className="space-y-4 pt-2">
+      <div className="space-y-3">
+        {members.map((m) => (
+          <div key={m.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl" data-testid={`member-row-${m.id}`}>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: m.color }}>
+                {m.avatar || m.name[0]}
+              </div>
+              <span className="font-medium text-sm">{m.name}</span>
+            </div>
+            <button onClick={() => deleteMutation.mutate(m.id)} className="text-red-400 hover:text-red-600 p-1" data-testid={`button-delete-member-${m.id}`}><Trash2 className="w-4 h-4" /></button>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-3 border-t pt-3">
+        <div className="flex gap-2">
+          <Input placeholder="שם" value={name} onChange={(e) => setName(e.target.value)} className="flex-1 h-9 text-sm" data-testid="input-member-name" />
+          <Input placeholder="🙂" value={avatar} onChange={(e) => setAvatar(e.target.value)} className="w-14 h-9 text-center text-lg" data-testid="input-member-avatar" />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {colors.map((c) => (
+            <button key={c} onClick={() => setColor(c)} className={`w-8 h-8 rounded-full transition-all ${color === c ? "ring-2 ring-offset-2 ring-foreground scale-110" : ""}`} style={{ backgroundColor: c }} data-testid={`button-color-${c}`} />
+          ))}
+        </div>
+        <Button className="w-full rounded-xl bg-primary h-9 text-sm" onClick={() => addMutation.mutate({ name, avatar: avatar || null, color })} disabled={!name || addMutation.isPending} data-testid="button-add-member">
+          {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />} הוסף בן משפחה
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function TipsView() {
   const { data: tipsList = [], isLoading } = useQuery<Tip[]>({ queryKey: ["/api/tips"] });
-
-  if (isLoading) {
-    return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
-  }
-
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/tips/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tips"] }),
+  });
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
       <h2 className="text-lg font-bold text-foreground tracking-tight px-1">📌 טיפים חשובים</h2>
       <div className="space-y-3">
-        {tipsList.map((tip, i) => (
-          <Card key={tip.id} className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white" data-testid={`tip-${tip.id}`}>
+        {tipsList.map((tip) => (
+          <Card key={tip.id} className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white group" data-testid={`tip-${tip.id}`}>
             <CardContent className="p-4 flex items-start gap-3">
               <span className="text-xl flex-shrink-0 mt-0.5">{tip.icon}</span>
-              <p className="text-sm text-foreground/90 leading-relaxed">{tip.text}</p>
+              <p className="text-sm text-foreground/90 leading-relaxed flex-1">{tip.text}</p>
+              <button onClick={() => deleteMutation.mutate(tip.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity flex-shrink-0" data-testid={`button-delete-tip-${tip.id}`}>
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             </CardContent>
           </Card>
         ))}
       </div>
-
+      <AddTipForm />
       <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-gradient-to-br from-primary/5 to-secondary/5">
         <CardContent className="p-5">
           <h3 className="font-bold text-sm mb-3">💰 הערכת תקציב</h3>
           <div className="space-y-2 text-xs">
-            {[
-              ["🏨 לינה ליד שדה (2 לילות)", "€160–240"],
-              ["🏨 לינה בצפון צ'כיה (9 לילות)", "€550–900"],
-              ["🚗 רכב שכור (10 ימים)", "€300–420"],
-              ["⛽ דלק", "€100–150"],
-              ["🎟 כניסה לאטרקציות", "€150–250"],
-              ["🍽 אוכל", "€600–900"],
-              ["🛍 שונות", "€100–150"],
-            ].map(([item, cost]) => (
-              <div key={item} className="flex justify-between items-center py-1 border-b border-border/50 last:border-0">
-                <span className="text-foreground/80">{item}</span>
-                <span className="font-bold text-foreground">{cost}</span>
-              </div>
+            {[["🏨 לינה ליד שדה (2 לילות)", "€160–240"], ["🏨 לינה בצפון צ'כיה (9 לילות)", "€550–900"], ["🚗 רכב שכור (10 ימים)", "€300–420"], ["⛽ דלק", "€100–150"], ["🎟 כניסה לאטרקציות", "€150–250"], ["🍽 אוכל", "€600–900"], ["🛍 שונות", "€100–150"]].map(([item, cost]) => (
+              <div key={item} className="flex justify-between items-center py-1 border-b border-border/50 last:border-0"><span className="text-foreground/80">{item}</span><span className="font-bold text-foreground">{cost}</span></div>
             ))}
-            <div className="flex justify-between items-center pt-2 font-bold text-sm text-primary">
-              <span>📊 סה"כ הערכה</span>
-              <span>€1,960–3,010</span>
-            </div>
+            <div className="flex justify-between items-center pt-2 font-bold text-sm text-primary"><span>📊 סה"כ הערכה</span><span>€1,960–3,010</span></div>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-3">
-            צ'כיה זולה מאוד ביחס למערב אירופה. ארוחת צהריים במסעדה ~€8–15 לאדם.
-          </p>
+          <p className="text-[10px] text-muted-foreground mt-3">צ'כיה זולה מאוד ביחס למערב אירופה. ארוחת צהריים במסעדה ~€8–15 לאדם.</p>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function AddTipForm() {
+  const [open, setOpen] = useState(false);
+  const [icon, setIcon] = useState("💡");
+  const [text, setText] = useState("");
+  const mutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/tips", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/tips"] }); setOpen(false); setIcon("💡"); setText(""); },
+  });
+  if (!open) return (
+    <button onClick={() => setOpen(true)} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 py-1 px-1" data-testid="button-add-tip">
+      <Plus className="w-3 h-3" /> הוסף טיפ
+    </button>
+  );
+  return (
+    <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex gap-2">
+          <Input placeholder="🔔" value={icon} onChange={(e) => setIcon(e.target.value)} className="w-14 h-9 text-center text-lg" data-testid="input-tip-icon" />
+          <Input placeholder="טקסט הטיפ..." value={text} onChange={(e) => setText(e.target.value)} className="flex-1 h-9 text-sm" data-testid="input-tip-text" />
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" className="h-8 text-xs rounded-lg bg-primary" onClick={() => mutation.mutate({ icon, text, sortOrder: 99 })} disabled={!text || mutation.isPending} data-testid="button-save-tip">
+            {mutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "שמור"}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 text-xs rounded-lg" onClick={() => setOpen(false)}>ביטול</Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
