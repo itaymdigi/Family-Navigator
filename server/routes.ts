@@ -32,12 +32,22 @@ const upload = multer({
   },
 });
 
-const openrouter = new OpenAI({
-  baseURL: process.env.OPENROUTER_API_KEY
+function getOpenRouterClient() {
+  const userKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = userKey || process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY;
+  const baseURL = userKey
     ? "https://openrouter.ai/api/v1"
-    : process.env.AI_INTEGRATIONS_OPENROUTER_BASE_URL,
-  apiKey: process.env.OPENROUTER_API_KEY || process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY,
-});
+    : process.env.AI_INTEGRATIONS_OPENROUTER_BASE_URL;
+  return new OpenAI({
+    baseURL,
+    apiKey,
+    defaultHeaders: {
+      "Authorization": `Bearer ${apiKey}`,
+      "HTTP-Referer": "https://replit.com",
+      "X-Title": "Czech Trip Planner",
+    },
+  });
+}
 
 const TRIP_SYSTEM_PROMPT = `אתה מדריך טיולים וירטואלי מומחה לצפון צ'כיה. אתה עוזר למשפחה ישראלית (2 מבוגרים + 2 ילדים גילאי 11-14) שנוסעת לטיול בצפון צ'כיה בין 25.3 ל-4.4.2026.
 
@@ -227,8 +237,9 @@ export async function registerRoutes(
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
+      const openrouter = getOpenRouterClient();
       const stream = await openrouter.chat.completions.create({
-        model: "openrouter/auto",
+        model: "mistralai/mistral-small-3.1-24b-instruct:free",
         messages: [
           { role: "system", content: TRIP_SYSTEM_PROMPT },
           ...messages,
