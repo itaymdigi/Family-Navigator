@@ -33,8 +33,10 @@ const upload = multer({
 });
 
 const openrouter = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENROUTER_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY,
+  baseURL: process.env.OPENROUTER_API_KEY
+    ? "https://openrouter.ai/api/v1"
+    : process.env.AI_INTEGRATIONS_OPENROUTER_BASE_URL,
+  apiKey: process.env.OPENROUTER_API_KEY || process.env.AI_INTEGRATIONS_OPENROUTER_API_KEY,
 });
 
 const TRIP_SYSTEM_PROMPT = `אתה מדריך טיולים וירטואלי מומחה לצפון צ'כיה. אתה עוזר למשפחה ישראלית (2 מבוגרים + 2 ילדים גילאי 11-14) שנוסעת לטיול בצפון צ'כיה בין 25.3 ל-4.4.2026.
@@ -226,7 +228,7 @@ export async function registerRoutes(
       res.setHeader("Connection", "keep-alive");
 
       const stream = await openrouter.chat.completions.create({
-        model: "deepseek/deepseek-chat-v3-0324:free",
+        model: "openrouter/auto",
         messages: [
           { role: "system", content: TRIP_SYSTEM_PROMPT },
           ...messages,
