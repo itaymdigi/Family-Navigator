@@ -42,7 +42,6 @@ function getOpenRouterClient() {
     baseURL,
     apiKey,
     defaultHeaders: {
-      "Authorization": `Bearer ${apiKey}`,
       "HTTP-Referer": "https://replit.com",
       "X-Title": "Czech Trip Planner",
     },
@@ -226,6 +225,13 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  const CHAT_MODELS = [
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "qwen/qwen3-4b:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+  ];
+
   app.post("/api/chat", async (req, res) => {
     try {
       const { messages } = req.body;
@@ -238,15 +244,31 @@ export async function registerRoutes(
       res.setHeader("Connection", "keep-alive");
 
       const openrouter = getOpenRouterClient();
-      const stream = await openrouter.chat.completions.create({
-        model: "mistralai/mistral-small-3.1-24b-instruct:free",
-        messages: [
-          { role: "system", content: TRIP_SYSTEM_PROMPT },
-          ...messages,
-        ],
-        stream: true,
-        max_tokens: 2048,
-      });
+      let stream = null;
+      let lastError: any = null;
+
+      for (const model of CHAT_MODELS) {
+        try {
+          stream = await openrouter.chat.completions.create({
+            model,
+            messages: [
+              { role: "system", content: TRIP_SYSTEM_PROMPT },
+              ...messages,
+            ],
+            stream: true,
+            max_tokens: 2048,
+          });
+          break;
+        } catch (err: any) {
+          lastError = err;
+          if (err.status === 429) {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+          continue;
+        }
+      }
+
+      if (!stream) throw lastError || new Error("All models unavailable");
 
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content || "";
@@ -258,12 +280,12 @@ export async function registerRoutes(
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       res.end();
     } catch (error: any) {
-      console.error("Chat error:", error);
+      console.error("Chat error:", error.message);
       if (res.headersSent) {
-        res.write(`data: ${JSON.stringify({ error: error.message || "שגיאה" })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: "הבוט עמוס כרגע, נסו שוב בעוד כמה שניות" })}\n\n`);
         res.end();
       } else {
-        res.status(500).json({ message: error.message || "Chat failed" });
+        res.status(429).json({ message: "הבוט עמוס כרגע, נסו שוב בעוד כמה שניות" });
       }
     }
   });
