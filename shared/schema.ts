@@ -1,21 +1,72 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, serial, real } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, real, boolean, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const places = pgTable("places", {
+export const tripDays = pgTable("trip_days", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  location: text("location").notNull(),
-  type: text("type").notNull(),
-  image: text("image").notNull(),
-  lat: real("lat"),
-  lng: real("lng"),
+  dayNumber: integer("day_number").notNull(),
+  date: text("date").notNull(),
+  title: text("title").notNull(),
+  subtitle: text("subtitle"),
+  rating: integer("rating"),
+  mapsUrl: text("maps_url"),
+  notes: json("notes").$type<string[]>(),
 });
 
-export const insertPlaceSchema = createInsertSchema(places).omit({ id: true });
-export type InsertPlace = z.infer<typeof insertPlaceSchema>;
-export type Place = typeof places.$inferSelect;
+export const insertTripDaySchema = createInsertSchema(tripDays).omit({ id: true });
+export type InsertTripDay = z.infer<typeof insertTripDaySchema>;
+export type TripDay = typeof tripDays.$inferSelect;
+
+export const dayEvents = pgTable("day_events", {
+  id: serial("id").primaryKey(),
+  dayId: integer("day_id").notNull(),
+  time: text("time").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull(),
+});
+
+export const insertDayEventSchema = createInsertSchema(dayEvents).omit({ id: true });
+export type InsertDayEvent = z.infer<typeof insertDayEventSchema>;
+export type DayEvent = typeof dayEvents.$inferSelect;
+
+export const attractions = pgTable("attractions", {
+  id: serial("id").primaryKey(),
+  dayId: integer("day_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  duration: text("duration"),
+  price: text("price"),
+  lat: real("lat"),
+  lng: real("lng"),
+  mapsUrl: text("maps_url"),
+  wazeUrl: text("waze_url"),
+  badges: json("badges").$type<string[]>(),
+  image: text("image"),
+});
+
+export const insertAttractionSchema = createInsertSchema(attractions).omit({ id: true });
+export type InsertAttraction = z.infer<typeof insertAttractionSchema>;
+export type Attraction = typeof attractions.$inferSelect;
+
+export const accommodations = pgTable("accommodations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  stars: integer("stars").notNull(),
+  description: text("description").notNull(),
+  priceRange: text("price_range"),
+  lat: real("lat"),
+  lng: real("lng"),
+  mapsUrl: text("maps_url"),
+  wazeUrl: text("waze_url"),
+  dates: text("dates").notNull(),
+  baseName: text("base_name"),
+  isSelected: boolean("is_selected").default(false),
+});
+
+export const insertAccommodationSchema = createInsertSchema(accommodations).omit({ id: true });
+export type InsertAccommodation = z.infer<typeof insertAccommodationSchema>;
+export type Accommodation = typeof accommodations.$inferSelect;
 
 export const photos = pgTable("photos", {
   id: serial("id").primaryKey(),
@@ -38,3 +89,14 @@ export const currencyRates = pgTable("currency_rates", {
 export const insertCurrencyRateSchema = createInsertSchema(currencyRates).omit({ id: true });
 export type InsertCurrencyRate = z.infer<typeof insertCurrencyRateSchema>;
 export type CurrencyRate = typeof currencyRates.$inferSelect;
+
+export const tips = pgTable("tips", {
+  id: serial("id").primaryKey(),
+  icon: text("icon").notNull(),
+  text: text("text").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+});
+
+export const insertTipSchema = createInsertSchema(tips).omit({ id: true });
+export type InsertTip = z.infer<typeof insertTipSchema>;
+export type Tip = typeof tips.$inferSelect;

@@ -1,44 +1,38 @@
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { db } from "./db";
 import {
-  places, photos, currencyRates,
-  type Place, type InsertPlace,
-  type Photo, type InsertPhoto,
-  type CurrencyRate, type InsertCurrencyRate,
+  tripDays, dayEvents, attractions, accommodations, photos, currencyRates, tips,
+  type TripDay, type DayEvent, type Attraction, type Accommodation,
+  type Photo, type InsertPhoto, type CurrencyRate, type Tip,
 } from "@shared/schema";
 
 export interface IStorage {
-  getPlaces(): Promise<Place[]>;
-  getPlace(id: number): Promise<Place | undefined>;
-  createPlace(place: InsertPlace): Promise<Place>;
-  deletePlace(id: number): Promise<void>;
-
+  getTripDays(): Promise<TripDay[]>;
+  getDayEvents(dayId: number): Promise<DayEvent[]>;
+  getAttractions(dayId: number): Promise<Attraction[]>;
+  getAccommodations(): Promise<Accommodation[]>;
   getPhotos(): Promise<Photo[]>;
   createPhoto(photo: InsertPhoto): Promise<Photo>;
   deletePhoto(id: number): Promise<void>;
-
   getCurrencyRates(): Promise<CurrencyRate[]>;
-  getCurrencyRate(id: number): Promise<CurrencyRate | undefined>;
-  createCurrencyRate(rate: InsertCurrencyRate): Promise<CurrencyRate>;
+  getTips(): Promise<Tip[]>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async getPlaces(): Promise<Place[]> {
-    return db.select().from(places);
+  async getTripDays(): Promise<TripDay[]> {
+    return db.select().from(tripDays).orderBy(asc(tripDays.dayNumber));
   }
 
-  async getPlace(id: number): Promise<Place | undefined> {
-    const [place] = await db.select().from(places).where(eq(places.id, id));
-    return place;
+  async getDayEvents(dayId: number): Promise<DayEvent[]> {
+    return db.select().from(dayEvents).where(eq(dayEvents.dayId, dayId)).orderBy(asc(dayEvents.sortOrder));
   }
 
-  async createPlace(place: InsertPlace): Promise<Place> {
-    const [created] = await db.insert(places).values(place).returning();
-    return created;
+  async getAttractions(dayId: number): Promise<Attraction[]> {
+    return db.select().from(attractions).where(eq(attractions.dayId, dayId));
   }
 
-  async deletePlace(id: number): Promise<void> {
-    await db.delete(places).where(eq(places.id, id));
+  async getAccommodations(): Promise<Accommodation[]> {
+    return db.select().from(accommodations);
   }
 
   async getPhotos(): Promise<Photo[]> {
@@ -58,14 +52,8 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(currencyRates);
   }
 
-  async getCurrencyRate(id: number): Promise<CurrencyRate | undefined> {
-    const [rate] = await db.select().from(currencyRates).where(eq(currencyRates.id, id));
-    return rate;
-  }
-
-  async createCurrencyRate(rate: InsertCurrencyRate): Promise<CurrencyRate> {
-    const [created] = await db.insert(currencyRates).values(rate).returning();
-    return created;
+  async getTips(): Promise<Tip[]> {
+    return db.select().from(tips).orderBy(asc(tips.sortOrder));
   }
 }
 
