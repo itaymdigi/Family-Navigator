@@ -8,6 +8,7 @@ import {
   insertFamilyMemberSchema, insertMapLocationSchema, insertTravelDocumentSchema,
   insertRestaurantSchema,
   tripDays, dayEvents, attractions, accommodations, tips, users,
+  photos, currencyRates, restaurants,
 } from "@shared/schema";
 import OpenAI from "openai";
 import multer from "multer";
@@ -438,6 +439,54 @@ export async function registerRoutes(
       }
     }
   });
+
+  async function autoSeedIfEmpty() {
+    try {
+      let seedPath = path.join(process.cwd(), "server", "seed-data.json");
+      if (!fs.existsSync(seedPath)) {
+        seedPath = path.join(__dirname, "seed-data.json");
+      }
+      if (!fs.existsSync(seedPath)) {
+        seedPath = path.join(process.cwd(), "dist", "server", "seed-data.json");
+      }
+      if (!fs.existsSync(seedPath)) return;
+
+      const existing = await db.select().from(tripDays);
+      if (existing.length > 0) return;
+
+      console.log("[seed] Database empty, auto-seeding...");
+      const seedData = JSON.parse(fs.readFileSync(seedPath, "utf-8"));
+
+      const tableOrder = ["trip_days", "day_events", "attractions", "accommodations", "photos", "currency_rates", "tips", "restaurants"];
+      const tableMap: Record<string, any> = {
+        trip_days: tripDays,
+        day_events: dayEvents,
+        attractions: attractions,
+        accommodations: accommodations,
+        photos: photos,
+        currency_rates: currencyRates,
+        tips: tips,
+        restaurants: restaurants,
+      };
+
+      for (const tableName of tableOrder) {
+        const table = tableMap[tableName];
+        const rows = seedData[tableName];
+        if (!rows || rows.length === 0) continue;
+
+        for (const row of rows) {
+          const { id, ...data } = row;
+          await db.insert(table).values(data);
+        }
+        console.log(`[seed] ${tableName}: ${rows.length} rows`);
+      }
+      console.log("[seed] Auto-seed complete!");
+    } catch (e: any) {
+      console.error("[seed] Auto-seed error:", e.message);
+    }
+  }
+
+  autoSeedIfEmpty();
 
   return httpServer;
 }

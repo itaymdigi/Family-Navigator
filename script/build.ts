@@ -1,6 +1,7 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, copyFile, mkdir } from "fs/promises";
+import { existsSync } from "fs";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -30,6 +31,7 @@ const allowlist = [
   "xlsx",
   "zod",
   "zod-validation-error",
+  "bcryptjs",
 ];
 
 async function buildAll() {
@@ -59,6 +61,12 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  if (existsSync("server/seed-data.json")) {
+    await mkdir("dist/server", { recursive: true });
+    await copyFile("server/seed-data.json", "dist/server/seed-data.json");
+    console.log("copied seed-data.json to dist/server/");
+  }
 }
 
 buildAll().catch((err) => {
