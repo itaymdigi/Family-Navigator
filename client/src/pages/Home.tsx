@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, createContext, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   CalendarDays, Hotel, Calculator, Image as ImageIcon,
   MapPin, ExternalLink, Navigation, Clock, Star, Users,
   ChevronDown, ChevronUp, Lightbulb, Camera, Trash2, Loader2,
   Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi,
-  Filter, Maximize2
+  Filter, Maximize2, Lock, Unlock, FileText, FolderOpen, Globe,
+  Plane, CreditCard, FileCheck, MoreVertical
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { TripDay, DayEvent, Attraction, Accommodation, Photo, CurrencyRate, Tip, FamilyMember } from "@shared/schema";
+import type { TripDay, DayEvent, Attraction, Accommodation, Photo, CurrencyRate, Tip, FamilyMember, MapLocation, TravelDocument } from "@shared/schema";
+
+const AdminContext = createContext<{ isAdmin: boolean; toggleAdmin: () => void }>({ isAdmin: false, toggleAdmin: () => {} });
+function useAdmin() { return useContext(AdminContext); }
 
 function useOnlineStatus() {
   const [online, setOnline] = useState(navigator.onLine);
@@ -31,51 +35,120 @@ function useOnlineStatus() {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("itinerary");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [pin, setPin] = useState("");
   const isOnline = useOnlineStatus();
 
+  const ADMIN_PIN = "1234";
+
+  const toggleAdmin = () => {
+    if (isAdmin) {
+      setIsAdmin(false);
+    } else {
+      setShowPinDialog(true);
+      setPin("");
+    }
+  };
+
+  const handlePinSubmit = () => {
+    if (pin === ADMIN_PIN) {
+      setIsAdmin(true);
+      setShowPinDialog(false);
+      setPin("");
+    } else {
+      setPin("");
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-muted/50 flex justify-center selection:bg-primary/20" dir="rtl">
-      <div className="w-full max-w-md bg-background shadow-2xl min-h-screen relative flex flex-col pb-20 overflow-hidden sm:border-x sm:border-border">
-        <header className="pt-10 pb-6 px-6 bg-gradient-to-br from-primary via-primary to-[hsl(var(--primary)/0.85)] text-primary-foreground rounded-b-[2rem] shadow-lg z-10 relative">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-2xl">🇨🇿</span>
-                <h1 className="text-xl font-bold tracking-tight" data-testid="text-trip-title">טיול צפון צ'כיה</h1>
+    <AdminContext.Provider value={{ isAdmin, toggleAdmin }}>
+      <div className="min-h-screen bg-muted/50 flex justify-center selection:bg-primary/20" dir="rtl">
+        <div className="w-full max-w-md bg-background shadow-2xl min-h-screen relative flex flex-col pb-20 overflow-hidden sm:border-x sm:border-border">
+          <header className="pt-10 pb-6 px-6 bg-gradient-to-br from-primary via-primary to-[hsl(var(--primary)/0.85)] text-primary-foreground rounded-b-[2rem] shadow-lg z-10 relative">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-2xl">🇨🇿</span>
+                  <h1 className="text-xl font-bold tracking-tight" data-testid="text-trip-title">טיול צפון צ'כיה</h1>
+                </div>
+                <p className="text-primary-foreground/90 text-sm font-medium">25.3 – 4.4.2026 · 11 ימים · 👨‍👩‍👦‍👦 4 נוסעים</p>
               </div>
-              <p className="text-primary-foreground/90 text-sm font-medium">25.3 – 4.4.2026 · 11 ימים · 👨‍👩‍👦‍👦 4 נוסעים</p>
+              <div className="flex items-center gap-2">
+                {!isOnline && (
+                  <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full" data-testid="offline-indicator">
+                    <CloudOff className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-semibold">אופליין</span>
+                  </div>
+                )}
+                <button
+                  onClick={toggleAdmin}
+                  className={`p-2 rounded-full transition-all ${isAdmin ? "bg-green-500/30 text-white" : "bg-white/15 text-white/70 hover:bg-white/25"}`}
+                  data-testid="button-toggle-admin"
+                  title={isAdmin ? "מצב עריכה פעיל" : "כניסה למצב עריכה"}
+                >
+                  {isAdmin ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-            {!isOnline && (
-              <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full" data-testid="offline-indicator">
-                <CloudOff className="w-3.5 h-3.5" />
-                <span className="text-[11px] font-semibold">אופליין</span>
+            <div className="flex gap-2 flex-wrap">
+              {["🏔 שוויץ הבוהמית", "🪨 אדרשפאך", "🌲 גן עדן בוהמי", "🏰 טירות"].map((tag) => (
+                <span key={tag} className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-semibold">{tag}</span>
+              ))}
+            </div>
+            {isAdmin && (
+              <div className="mt-3 bg-green-500/20 backdrop-blur-sm px-3 py-1.5 rounded-full text-center">
+                <span className="text-[11px] font-bold">מצב עריכה פעיל - ניתן להוסיף, לערוך ולמחוק</span>
               </div>
             )}
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {["🏔 שוויץ הבוהמית", "🪨 אדרשפאך", "🌲 גן עדן בוהמי", "🏰 טירות"].map((tag) => (
-              <span key={tag} className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-semibold">{tag}</span>
-            ))}
-          </div>
-        </header>
+          </header>
 
-        <main className="flex-1 overflow-y-auto p-4 space-y-4 z-0">
-          {activeTab === "itinerary" && <ItineraryView />}
-          {activeTab === "hotels" && <HotelsView />}
-          {activeTab === "currency" && <CurrencyView />}
-          {activeTab === "photos" && <PhotosView />}
-          {activeTab === "tips" && <TipsView />}
-        </main>
+          <main className="flex-1 overflow-y-auto p-4 space-y-4 z-0">
+            {activeTab === "itinerary" && <ItineraryView />}
+            {activeTab === "hotels" && <HotelsView />}
+            {activeTab === "currency" && <CurrencyView />}
+            {activeTab === "map" && <MapView />}
+            {activeTab === "photos" && <PhotosView />}
+            {activeTab === "docs" && <DocsView />}
+            {activeTab === "tips" && <TipsView />}
+          </main>
 
-        <nav className="absolute bottom-0 left-0 w-full bg-white border-t border-border px-2 py-3 flex justify-between items-center rounded-t-3xl shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-20">
-          <NavItem icon={<CalendarDays className="w-5 h-5" />} label="מסלול" isActive={activeTab === "itinerary"} onClick={() => setActiveTab("itinerary")} />
-          <NavItem icon={<Hotel className="w-5 h-5" />} label="לינה" isActive={activeTab === "hotels"} onClick={() => setActiveTab("hotels")} />
-          <NavItem icon={<Calculator className="w-5 h-5" />} label="מט״ח" isActive={activeTab === "currency"} onClick={() => setActiveTab("currency")} />
-          <NavItem icon={<ImageIcon className="w-5 h-5" />} label="תמונות" isActive={activeTab === "photos"} onClick={() => setActiveTab("photos")} />
-          <NavItem icon={<Lightbulb className="w-5 h-5" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
-        </nav>
+          <nav className="absolute bottom-0 left-0 w-full bg-white border-t border-border px-1 py-3 flex justify-between items-center rounded-t-3xl shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-20">
+            <NavItem icon={<CalendarDays className="w-5 h-5" />} label="מסלול" isActive={activeTab === "itinerary"} onClick={() => setActiveTab("itinerary")} />
+            <NavItem icon={<Hotel className="w-5 h-5" />} label="לינה" isActive={activeTab === "hotels"} onClick={() => setActiveTab("hotels")} />
+            <NavItem icon={<Globe className="w-5 h-5" />} label="מפה" isActive={activeTab === "map"} onClick={() => setActiveTab("map")} />
+            <NavItem icon={<Calculator className="w-5 h-5" />} label="מט״ח" isActive={activeTab === "currency"} onClick={() => setActiveTab("currency")} />
+            <NavItem icon={<ImageIcon className="w-5 h-5" />} label="תמונות" isActive={activeTab === "photos"} onClick={() => setActiveTab("photos")} />
+            <NavItem icon={<FolderOpen className="w-5 h-5" />} label="מסמכים" isActive={activeTab === "docs"} onClick={() => setActiveTab("docs")} />
+            <NavItem icon={<Lightbulb className="w-5 h-5" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
+          </nav>
+
+          <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
+            <DialogContent className="max-w-[85vw] rounded-2xl" dir="rtl">
+              <DialogHeader><DialogTitle>כניסה למצב עריכה</DialogTitle></DialogHeader>
+              <div className="space-y-4 pt-2">
+                <p className="text-sm text-muted-foreground">הזינו קוד PIN כדי לאפשר עריכה, הוספה ומחיקה</p>
+                <Input
+                  type="password"
+                  placeholder="קוד PIN"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handlePinSubmit(); }}
+                  className="text-center text-2xl tracking-[0.5em] h-14"
+                  maxLength={4}
+                  data-testid="input-admin-pin"
+                  autoFocus
+                  dir="ltr"
+                />
+                <Button className="w-full rounded-xl bg-primary h-11" onClick={handlePinSubmit} disabled={pin.length < 4} data-testid="button-submit-pin">
+                  <Unlock className="w-4 h-4 ml-2" /> כניסה
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
-    </div>
+    </AdminContext.Provider>
   );
 }
 
@@ -114,6 +187,7 @@ function EditableField({ value, onSave, type = "text", className = "" }: { value
 
 function DayCard({ day }: { day: TripDay }) {
   const [expanded, setExpanded] = useState(false);
+  const { isAdmin } = useAdmin();
   const { data: events = [] } = useQuery<DayEvent[]>({ queryKey: ["/api/trip-days", String(day.id), "events"], enabled: expanded });
   const { data: dayAttractions = [] } = useQuery<Attraction[]>({ queryKey: ["/api/trip-days", String(day.id), "attractions"], enabled: expanded });
 
@@ -174,11 +248,13 @@ function DayCard({ day }: { day: TripDay }) {
               </div>
             </div>
           )}
-          <div className="flex gap-2 justify-end">
-            <button onClick={(e) => { e.stopPropagation(); deleteDay.mutate(); }} className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors" data-testid={`button-delete-day-${day.dayNumber}`}>
-              <Trash2 className="w-3 h-3" /> מחק יום
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="flex gap-2 justify-end">
+              <button onClick={(e) => { e.stopPropagation(); deleteDay.mutate(); }} className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors" data-testid={`button-delete-day-${day.dayNumber}`}>
+                <Trash2 className="w-3 h-3" /> מחק יום
+              </button>
+            </div>
+          )}
           {day.notes && (day.notes as string[]).length > 0 && (
             <div className="space-y-2">
               {(day.notes as string[]).map((note, i) => (
@@ -201,15 +277,15 @@ function DayCard({ day }: { day: TripDay }) {
                       <p className="font-semibold text-sm text-foreground">{event.title}</p>
                       {event.description && <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>}
                     </div>
-                    <button onClick={() => deleteEvent.mutate(event.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-event-${event.id}`}>
+                    {isAdmin && <button onClick={() => deleteEvent.mutate(event.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-event-${event.id}`}>
                       <Trash2 className="w-3 h-3" />
-                    </button>
+                    </button>}
                   </div>
                 ))}
               </div>
             </div>
           )}
-          <AddEventForm dayId={day.id} />
+          {isAdmin && <AddEventForm dayId={day.id} />}
           {dayAttractions.length > 0 && (
             <div className="space-y-3 pt-2">
               <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">אטרקציות</h4>
@@ -261,9 +337,9 @@ function AddEventForm({ dayId }: { dayId: number }) {
 function AttractionCard({ attraction, dayId, onDelete }: { attraction: Attraction; dayId: number; onDelete: () => void }) {
   return (
     <div className="bg-muted/40 rounded-xl p-3 space-y-2.5 group relative" data-testid={`attraction-${attraction.id}`}>
-      <button onClick={onDelete} className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1.5 bg-white/80 rounded-lg transition-opacity z-10" data-testid={`button-delete-attr-${attraction.id}`}>
+      {useAdmin().isAdmin && <button onClick={onDelete} className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1.5 bg-white/80 rounded-lg transition-opacity z-10" data-testid={`button-delete-attr-${attraction.id}`}>
         <Trash2 className="w-3 h-3" />
-      </button>
+      </button>}
       {attraction.image && (
         <div className="h-28 rounded-lg overflow-hidden"><img src={attraction.image} alt={attraction.name} className="w-full h-full object-cover" /></div>
       )}
@@ -306,6 +382,7 @@ function ItineraryView() {
 }
 
 function HotelsView() {
+  const { isAdmin } = useAdmin();
   const { data: hotels = [], isLoading } = useQuery<Accommodation[]>({ queryKey: ["/api/accommodations"] });
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/accommodations/${id}`),
@@ -332,9 +409,9 @@ function HotelsView() {
                   </div>
                   <div className="flex items-center gap-1">
                     {hotel.priceRange && <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg">{hotel.priceRange}</span>}
-                    <button onClick={() => deleteMutation.mutate(hotel.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-hotel-${hotel.id}`}>
+                    {isAdmin && <button onClick={() => deleteMutation.mutate(hotel.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-hotel-${hotel.id}`}>
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </button>}
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{hotel.description}</p>
@@ -400,6 +477,7 @@ function CurrencyView() {
 }
 
 function PhotosView() {
+  const { isAdmin } = useAdmin();
   const { data: photos = [], isLoading } = useQuery<Photo[]>({ queryKey: ["/api/photos"] });
   const { data: members = [] } = useQuery<FamilyMember[]>({ queryKey: ["/api/family-members"] });
   const [showAdd, setShowAdd] = useState(false);
@@ -482,7 +560,7 @@ function PhotosView() {
       <div className="flex justify-between items-center px-1">
         <h2 className="text-lg font-bold text-foreground tracking-tight">📸 גלריית הטיול</h2>
         <div className="flex gap-1">
-          <Dialog open={showMembers} onOpenChange={setShowMembers}>
+          {isAdmin && <Dialog open={showMembers} onOpenChange={setShowMembers}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" className="text-primary hover:text-primary hover:bg-primary/10 rounded-full h-9 w-9" data-testid="button-manage-members">
                 <Users className="w-4 h-4" strokeWidth={2.5} />
@@ -492,8 +570,8 @@ function PhotosView() {
               <DialogHeader><DialogTitle>בני משפחה</DialogTitle></DialogHeader>
               <FamilyMembersManager />
             </DialogContent>
-          </Dialog>
-          <Dialog open={showAdd} onOpenChange={(o) => { setShowAdd(o); if (!o) resetForm(); }}>
+          </Dialog>}
+          {isAdmin && <Dialog open={showAdd} onOpenChange={(o) => { setShowAdd(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" className="text-secondary hover:text-secondary hover:bg-secondary/10 rounded-full h-9 w-9" data-testid="button-add-photo">
                 <Camera className="w-4 h-4" strokeWidth={2.5} />
@@ -566,7 +644,7 @@ function PhotosView() {
                 </Button>
               </div>
             </DialogContent>
-          </Dialog>
+          </Dialog>}
         </div>
       </div>
 
@@ -623,7 +701,7 @@ function PhotosView() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3">
                   <span className="text-white text-xs font-semibold">{photo.caption}</span>
-                  <button onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(photo.id); }} className="text-white/80 hover:text-red-400 p-1" data-testid={`button-delete-photo-${photo.id}`}><Trash2 className="w-4 h-4" /></button>
+                  {isAdmin && <button onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(photo.id); }} className="text-white/80 hover:text-red-400 p-1" data-testid={`button-delete-photo-${photo.id}`}><Trash2 className="w-4 h-4" /></button>}
                 </div>
               </div>
             );
@@ -709,7 +787,310 @@ function FamilyMembersManager() {
   );
 }
 
+function MapView() {
+  const { isAdmin } = useAdmin();
+  const { data: locations = [], isLoading: locsLoading } = useQuery<MapLocation[]>({ queryKey: ["/api/map-locations"] });
+  const { data: allAttractions = [] } = useQuery<(Attraction & { dayNumber: number; dayTitle: string })[]>({ queryKey: ["/api/all-attractions"] });
+  const { data: hotels = [] } = useQuery<Accommodation[]>({ queryKey: ["/api/accommodations"] });
+  const [showAdd, setShowAdd] = useState(false);
+  const [newLoc, setNewLoc] = useState({ name: "", description: "", lat: "", lng: "", type: "attraction", icon: "" });
+  const mapRef = useRef<any>(null);
+  const [mapReady, setMapReady] = useState(false);
+
+  const addMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/map-locations", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/map-locations"] }); setShowAdd(false); setNewLoc({ name: "", description: "", lat: "", lng: "", type: "attraction", icon: "" }); },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/map-locations/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/map-locations"] }),
+  });
+
+  useEffect(() => {
+    if (mapRef.current || !document.getElementById("trip-map")) return;
+    import("leaflet").then((L) => {
+      if (mapRef.current) return;
+      const map = L.default.map("trip-map").setView([50.65, 15.5], 8);
+      L.default.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      mapRef.current = { map, L: L.default };
+      setMapReady(true);
+    });
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.map.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const { map, L } = mapRef.current;
+
+    map.eachLayer((layer: any) => {
+      if (layer instanceof L.Marker) map.removeLayer(layer);
+    });
+
+    const attractionIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#FF6B6B;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🏰</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
+    const hotelIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#4ECDC4;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🏨</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
+    const customIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#6C5CE7;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">📍</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
+
+    allAttractions.forEach((attr) => {
+      if (attr.lat && attr.lng) {
+        L.marker([attr.lat, attr.lng], { icon: attractionIcon })
+          .addTo(map)
+          .bindPopup(`<div dir="rtl" style="text-align:right"><b>${attr.name}</b><br/><small>יום ${attr.dayNumber}</small><br/>${attr.description || ""}</div>`);
+      }
+    });
+
+    hotels.forEach((hotel) => {
+      if (hotel.lat && hotel.lng) {
+        L.marker([hotel.lat, hotel.lng], { icon: hotelIcon })
+          .addTo(map)
+          .bindPopup(`<div dir="rtl" style="text-align:right"><b>${hotel.name}</b><br/><small>${hotel.dates}</small></div>`);
+      }
+    });
+
+    locations.forEach((loc) => {
+      const icon = loc.icon ? L.divIcon({ className: "custom-marker", html: `<div style="background:#6C5CE7;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${loc.icon}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] }) : customIcon;
+      L.marker([loc.lat, loc.lng], { icon })
+        .addTo(map)
+        .bindPopup(`<div dir="rtl" style="text-align:right"><b>${loc.name}</b><br/>${loc.description || ""}</div>`);
+    });
+  }, [mapReady, allAttractions, hotels, locations]);
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
+      <div className="flex justify-between items-center px-1">
+        <h2 className="text-lg font-bold text-foreground tracking-tight">🗺️ מפת הטיול</h2>
+        {isAdmin && (
+          <Button variant="ghost" size="icon" className="text-primary hover:text-primary hover:bg-primary/10 rounded-full h-9 w-9" onClick={() => setShowAdd(true)} data-testid="button-add-location">
+            <Plus className="w-4 h-4" strokeWidth={2.5} />
+          </Button>
+        )}
+      </div>
+
+      <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white overflow-hidden">
+        <div id="trip-map" className="w-full h-[350px] rounded-2xl" style={{ zIndex: 1 }} data-testid="map-container" />
+      </Card>
+
+      <div className="flex gap-2 flex-wrap px-1">
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#FF6B6B] inline-block"></span> אטרקציות</span>
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#4ECDC4] inline-block"></span> לינה</span>
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#6C5CE7] inline-block"></span> מותאם אישית</span>
+      </div>
+
+      {locations.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-bold text-foreground/80 px-1">נקודות שנוספו ידנית</h3>
+          {locations.map((loc) => (
+            <Card key={loc.id} className="border-none shadow-sm rounded-xl bg-white group" data-testid={`location-${loc.id}`}>
+              <CardContent className="p-3 flex items-center gap-3">
+                <span className="text-lg">{loc.icon || "📍"}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{loc.name}</p>
+                  {loc.description && <p className="text-xs text-muted-foreground truncate">{loc.description}</p>}
+                </div>
+                <a
+                  href={`https://www.google.com/maps?q=${loc.lat},${loc.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors"
+                  data-testid={`button-location-nav-${loc.id}`}
+                >
+                  <Navigation className="w-3.5 h-3.5" />
+                </a>
+                {isAdmin && (
+                  <button onClick={() => deleteMutation.mutate(loc.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-location-${loc.id}`}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent className="max-w-[90vw] rounded-2xl" dir="rtl">
+          <DialogHeader><DialogTitle>הוספת מיקום חדש</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Input placeholder="שם המקום" value={newLoc.name} onChange={(e) => setNewLoc({ ...newLoc, name: e.target.value })} data-testid="input-location-name" />
+            <Input placeholder="תיאור (אופציונלי)" value={newLoc.description} onChange={(e) => setNewLoc({ ...newLoc, description: e.target.value })} data-testid="input-location-desc" />
+            <div className="flex gap-2">
+              <Input placeholder="קו רוחב (lat)" type="number" step="any" value={newLoc.lat} onChange={(e) => setNewLoc({ ...newLoc, lat: e.target.value })} className="flex-1" dir="ltr" data-testid="input-location-lat" />
+              <Input placeholder="קו אורך (lng)" type="number" step="any" value={newLoc.lng} onChange={(e) => setNewLoc({ ...newLoc, lng: e.target.value })} className="flex-1" dir="ltr" data-testid="input-location-lng" />
+            </div>
+            <div className="flex gap-2">
+              <Select value={newLoc.type} onValueChange={(v) => setNewLoc({ ...newLoc, type: v })}>
+                <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="attraction">אטרקציה</SelectItem>
+                  <SelectItem value="restaurant">מסעדה</SelectItem>
+                  <SelectItem value="viewpoint">תצפית</SelectItem>
+                  <SelectItem value="shopping">קניות</SelectItem>
+                  <SelectItem value="other">אחר</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input placeholder="אימוג'י" value={newLoc.icon} onChange={(e) => setNewLoc({ ...newLoc, icon: e.target.value })} className="w-16 text-center text-lg" data-testid="input-location-icon" />
+            </div>
+            <Button
+              className="w-full rounded-xl bg-primary h-11"
+              onClick={() => addMutation.mutate({ name: newLoc.name, description: newLoc.description || null, lat: parseFloat(newLoc.lat), lng: parseFloat(newLoc.lng), type: newLoc.type, icon: newLoc.icon || null, dayId: null })}
+              disabled={!newLoc.name || !newLoc.lat || !newLoc.lng || addMutation.isPending}
+              data-testid="button-save-location"
+            >
+              {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />} הוסף מיקום
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function DocsView() {
+  const { isAdmin } = useAdmin();
+  const { data: docs = [], isLoading } = useQuery<TravelDocument[]>({ queryKey: ["/api/travel-documents"] });
+  const [showAdd, setShowAdd] = useState(false);
+  const [newDoc, setNewDoc] = useState({ name: "", type: "other", url: "", notes: "" });
+
+  const addMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/travel-documents", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/travel-documents"] }); setShowAdd(false); setNewDoc({ name: "", type: "other", url: "", notes: "" }); },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/travel-documents/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/travel-documents"] }),
+  });
+
+  const docTypeInfo: Record<string, { icon: string; label: string; color: string }> = {
+    flight: { icon: "✈️", label: "טיסה", color: "bg-blue-50 text-blue-700" },
+    hotel: { icon: "🏨", label: "לינה", color: "bg-teal-50 text-teal-700" },
+    car: { icon: "🚗", label: "רכב", color: "bg-orange-50 text-orange-700" },
+    insurance: { icon: "🛡️", label: "ביטוח", color: "bg-purple-50 text-purple-700" },
+    passport: { icon: "🛂", label: "דרכון", color: "bg-red-50 text-red-700" },
+    visa: { icon: "📋", label: "ויזה", color: "bg-amber-50 text-amber-700" },
+    ticket: { icon: "🎫", label: "כרטיס", color: "bg-pink-50 text-pink-700" },
+    gdrive: { icon: "📁", label: "Google Drive", color: "bg-green-50 text-green-700" },
+    other: { icon: "📄", label: "אחר", color: "bg-gray-50 text-gray-700" },
+  };
+
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
+      <div className="flex justify-between items-center px-1">
+        <h2 className="text-lg font-bold text-foreground tracking-tight">📂 מסמכי נסיעה</h2>
+        {isAdmin && (
+          <Button variant="ghost" size="icon" className="text-primary hover:text-primary hover:bg-primary/10 rounded-full h-9 w-9" onClick={() => setShowAdd(true)} data-testid="button-add-doc">
+            <Plus className="w-4 h-4" strokeWidth={2.5} />
+          </Button>
+        )}
+      </div>
+
+      <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-gradient-to-br from-green-50 to-blue-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-2xl">📁</span>
+            <div>
+              <h3 className="font-bold text-sm">Google Drive</h3>
+              <p className="text-xs text-muted-foreground">הוסיפו קישורים לתיקיית Google Drive עם מסמכי הנסיעה</p>
+            </div>
+          </div>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-2 rounded-xl text-xs h-9"
+              onClick={() => { setNewDoc({ ...newDoc, type: "gdrive" }); setShowAdd(true); }}
+              data-testid="button-add-gdrive"
+            >
+              <FolderOpen className="w-3.5 h-3.5 ml-2" /> הוסף קישור ל-Google Drive
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {docs.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <FileText className="w-12 h-12 mx-auto mb-4 opacity-40" />
+          <p className="font-medium">אין מסמכים עדיין</p>
+          <p className="text-xs mt-1">הוסיפו כרטיסי טיסה, הזמנות מלון, ביטוח ועוד</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {docs.map((doc) => {
+            const info = docTypeInfo[doc.type] || docTypeInfo.other;
+            return (
+              <Card key={doc.id} className="border-none shadow-sm rounded-xl bg-white group" data-testid={`doc-${doc.id}`}>
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${info.color}`}>
+                    {info.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{doc.name}</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${info.color}`}>{info.label}</span>
+                      {doc.notes && <p className="text-[11px] text-muted-foreground truncate">{doc.notes}</p>}
+                    </div>
+                  </div>
+                  {doc.url && (
+                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors" data-testid={`button-open-doc-${doc.id}`}>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                  {isAdmin && (
+                    <button onClick={() => deleteMutation.mutate(doc.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-doc-${doc.id}`}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent className="max-w-[90vw] rounded-2xl" dir="rtl">
+          <DialogHeader><DialogTitle>הוספת מסמך</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Input placeholder="שם המסמך" value={newDoc.name} onChange={(e) => setNewDoc({ ...newDoc, name: e.target.value })} data-testid="input-doc-name" />
+            <Select value={newDoc.type} onValueChange={(v) => setNewDoc({ ...newDoc, type: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="flight">✈️ טיסה</SelectItem>
+                <SelectItem value="hotel">🏨 לינה</SelectItem>
+                <SelectItem value="car">🚗 רכב</SelectItem>
+                <SelectItem value="insurance">🛡️ ביטוח</SelectItem>
+                <SelectItem value="passport">🛂 דרכון</SelectItem>
+                <SelectItem value="ticket">🎫 כרטיס</SelectItem>
+                <SelectItem value="gdrive">📁 Google Drive</SelectItem>
+                <SelectItem value="other">📄 אחר</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input placeholder="קישור (URL)" value={newDoc.url} onChange={(e) => setNewDoc({ ...newDoc, url: e.target.value })} dir="ltr" data-testid="input-doc-url" />
+            <Textarea placeholder="הערות..." value={newDoc.notes} onChange={(e) => setNewDoc({ ...newDoc, notes: e.target.value })} className="min-h-[60px]" data-testid="input-doc-notes" />
+            <Button
+              className="w-full rounded-xl bg-primary h-11"
+              onClick={() => addMutation.mutate({ name: newDoc.name, type: newDoc.type, url: newDoc.url || null, notes: newDoc.notes || null, sortOrder: 0 })}
+              disabled={!newDoc.name || addMutation.isPending}
+              data-testid="button-save-doc"
+            >
+              {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />} שמור מסמך
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function TipsView() {
+  const { isAdmin } = useAdmin();
   const { data: tipsList = [], isLoading } = useQuery<Tip[]>({ queryKey: ["/api/tips"] });
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/tips/${id}`),
@@ -725,14 +1106,14 @@ function TipsView() {
             <CardContent className="p-4 flex items-start gap-3">
               <span className="text-xl flex-shrink-0 mt-0.5">{tip.icon}</span>
               <p className="text-sm text-foreground/90 leading-relaxed flex-1">{tip.text}</p>
-              <button onClick={() => deleteMutation.mutate(tip.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity flex-shrink-0" data-testid={`button-delete-tip-${tip.id}`}>
+              {isAdmin && <button onClick={() => deleteMutation.mutate(tip.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity flex-shrink-0" data-testid={`button-delete-tip-${tip.id}`}>
                 <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              </button>}
             </CardContent>
           </Card>
         ))}
       </div>
-      <AddTipForm />
+      {isAdmin && <AddTipForm />}
       <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-gradient-to-br from-primary/5 to-secondary/5">
         <CardContent className="p-5">
           <h3 className="font-bold text-sm mb-3">💰 הערכת תקציב</h3>

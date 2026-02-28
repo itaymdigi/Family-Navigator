@@ -118,6 +118,34 @@ export const insertTipSchema = createInsertSchema(tips).omit({ id: true });
 export type InsertTip = z.infer<typeof insertTipSchema>;
 export type Tip = typeof tips.$inferSelect;
 
+export const mapLocations = pgTable("map_locations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  lat: real("lat").notNull(),
+  lng: real("lng").notNull(),
+  type: text("type").notNull().default("attraction"),
+  icon: text("icon"),
+  dayId: integer("day_id"),
+});
+
+export const insertMapLocationSchema = createInsertSchema(mapLocations).omit({ id: true });
+export type InsertMapLocation = z.infer<typeof insertMapLocationSchema>;
+export type MapLocation = typeof mapLocations.$inferSelect;
+
+export const travelDocuments = pgTable("travel_documents", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull().default("other"),
+  url: text("url"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const insertTravelDocumentSchema = createInsertSchema(travelDocuments).omit({ id: true });
+export type InsertTravelDocument = z.infer<typeof insertTravelDocumentSchema>;
+export type TravelDocument = typeof travelDocuments.$inferSelect;
+
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),

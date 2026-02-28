@@ -2,6 +2,7 @@ import { eq, asc } from "drizzle-orm";
 import { db } from "./db";
 import {
   tripDays, dayEvents, attractions, accommodations, photos, currencyRates, tips, familyMembers,
+  mapLocations, travelDocuments,
   type TripDay, type InsertTripDay,
   type DayEvent, type InsertDayEvent,
   type Attraction, type InsertAttraction,
@@ -10,6 +11,8 @@ import {
   type CurrencyRate,
   type Tip, type InsertTip,
   type FamilyMember, type InsertFamilyMember,
+  type MapLocation, type InsertMapLocation,
+  type TravelDocument, type InsertTravelDocument,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -48,6 +51,16 @@ export interface IStorage {
   createFamilyMember(member: InsertFamilyMember): Promise<FamilyMember>;
   updateFamilyMember(id: number, member: Partial<InsertFamilyMember>): Promise<FamilyMember>;
   deleteFamilyMember(id: number): Promise<void>;
+
+  getMapLocations(): Promise<MapLocation[]>;
+  createMapLocation(loc: InsertMapLocation): Promise<MapLocation>;
+  updateMapLocation(id: number, loc: Partial<InsertMapLocation>): Promise<MapLocation>;
+  deleteMapLocation(id: number): Promise<void>;
+
+  getTravelDocuments(): Promise<TravelDocument[]>;
+  createTravelDocument(doc: InsertTravelDocument): Promise<TravelDocument>;
+  updateTravelDocument(id: number, doc: Partial<InsertTravelDocument>): Promise<TravelDocument>;
+  deleteTravelDocument(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -90,6 +103,16 @@ export class DatabaseStorage implements IStorage {
   async createFamilyMember(member: InsertFamilyMember) { const [r] = await db.insert(familyMembers).values(member).returning(); return r; }
   async updateFamilyMember(id: number, member: Partial<InsertFamilyMember>) { const [r] = await db.update(familyMembers).set(member).where(eq(familyMembers.id, id)).returning(); return r; }
   async deleteFamilyMember(id: number) { await db.delete(familyMembers).where(eq(familyMembers.id, id)); }
+
+  async getMapLocations() { return db.select().from(mapLocations); }
+  async createMapLocation(loc: InsertMapLocation) { const [r] = await db.insert(mapLocations).values(loc).returning(); return r; }
+  async updateMapLocation(id: number, loc: Partial<InsertMapLocation>) { const [r] = await db.update(mapLocations).set(loc).where(eq(mapLocations.id, id)).returning(); return r; }
+  async deleteMapLocation(id: number) { await db.delete(mapLocations).where(eq(mapLocations.id, id)); }
+
+  async getTravelDocuments() { return db.select().from(travelDocuments).orderBy(asc(travelDocuments.sortOrder)); }
+  async createTravelDocument(doc: InsertTravelDocument) { const [r] = await db.insert(travelDocuments).values(doc).returning(); return r; }
+  async updateTravelDocument(id: number, doc: Partial<InsertTravelDocument>) { const [r] = await db.update(travelDocuments).set(doc).where(eq(travelDocuments.id, id)).returning(); return r; }
+  async deleteTravelDocument(id: number) { await db.delete(travelDocuments).where(eq(travelDocuments.id, id)); }
 }
 
 export const storage = new DatabaseStorage();

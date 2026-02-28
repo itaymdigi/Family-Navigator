@@ -1,17 +1,24 @@
 # 🇨🇿 טיול צפון צ'כיה 2026 – Family Trip Companion
 
 ## Overview
-A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic (25.3–4.4.2026). Features day-by-day itinerary with timeline and weather forecasts, attractions with Google Maps/Waze navigation, accommodations overview, currency converter (CZK↔ILS, EUR↔ILS), collaborative photo gallery with file uploads, travel tips and budget estimates, and an AI chatbot (DeepSeek via OpenRouter) for Czech travel advice.
+A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic (25.3–4.4.2026). Features day-by-day itinerary with timeline and weather forecasts, attractions with Google Maps/Waze navigation, accommodations overview, currency converter (CZK↔ILS, EUR↔ILS), collaborative photo gallery with file uploads, interactive map with all trip points, travel documents section, travel tips and budget estimates, and an AI chatbot (multiple free models via OpenRouter) for Czech travel advice.
 
 ## Architecture
 - **Frontend**: React + Vite + Tailwind v4 + shadcn/ui + wouter routing
 - **Backend**: Express.js API server
 - **Database**: PostgreSQL with Drizzle ORM
 - **State Management**: TanStack React Query
-- **AI**: OpenRouter integration (DeepSeek model) with trip-specific Hebrew system prompt
+- **AI**: OpenRouter integration (fallback: Mistral → LLaMA → Qwen → Nemotron) with trip-specific Hebrew system prompt
 - **PWA**: Service worker for offline caching (API responses, photos, static assets)
 - **File Upload**: Multer for direct photo uploads from device
+- **Map**: Leaflet.js with OpenStreetMap tiles
 - **Direction**: RTL (Hebrew)
+
+## Access Control
+- Admin mode protected by PIN (default: 1234)
+- Lock/unlock toggle in header
+- All CRUD operations (add, edit, delete) require admin mode
+- View-only mode by default for all visitors
 
 ## Design System ("Soft Pop")
 - **Primary**: Coral (#FF6B6B)
@@ -19,7 +26,7 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - **Accent**: Sunny Yellow (#FFE66D)
 - **Success**: Mint (#95E1D3)
 - **Typography**: Poppins (headings) + Inter (UI)
-- **Layout**: Mobile-first, max-w-md, card-based, bottom navigation (5 tabs)
+- **Layout**: Mobile-first, max-w-md, card-based, bottom navigation (7 tabs)
 
 ## Data Model
 - `trip_days` — day-by-day itinerary (dayNumber, date, title, subtitle, rating, mapsUrl, notes, weatherIcon, weatherTemp, weatherDesc)
@@ -27,9 +34,11 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - `attractions` — places to visit with nav links (dayId, name, description, duration, price, lat/lng, mapsUrl, wazeUrl, badges)
 - `accommodations` — hotels/apartments (name, stars, description, priceRange, lat/lng, mapsUrl, wazeUrl, dates, baseName, isSelected)
 - `family_members` — family members for photo attribution (name, avatar, color)
-- `photos` — trip gallery (url, caption, uploadedBy)
+- `photos` — trip gallery (url, caption, uploadedBy, category)
 - `currency_rates` — exchange rates (fromCurrency, toCurrency, rate, flag)
 - `tips` — travel tips (icon, text, sortOrder)
+- `map_locations` — custom map pins (name, description, lat, lng, type, icon, dayId)
+- `travel_documents` — travel docs/links (name, type, url, notes, sortOrder)
 - `conversations` / `messages` — AI chat history
 
 ## API Routes
@@ -39,13 +48,13 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - `POST/PATCH/DELETE /api/day-events` — CRUD for events
 - `POST/PATCH/DELETE /api/attractions` — CRUD for attractions
 - `GET/POST/PATCH/DELETE /api/accommodations` — CRUD for accommodations
-- `GET /api/photos` — list photos
-- `POST /api/photos` — add photo by URL
-- `POST /api/photos/upload` — upload photo file (multipart/form-data)
-- `DELETE /api/photos/:id` — remove photo (also deletes file if uploaded)
+- `GET /api/photos`, `POST /api/photos`, `POST /api/photos/upload`, `DELETE /api/photos/:id`
 - `GET /api/currency-rates` — exchange rates
 - `GET/POST/PATCH/DELETE /api/tips` — CRUD for tips
 - `GET/POST/PATCH/DELETE /api/family-members` — CRUD for family members
+- `GET/POST/PATCH/DELETE /api/map-locations` — custom map locations
+- `GET/POST/PATCH/DELETE /api/travel-documents` — travel docs
+- `GET /api/all-attractions` — all attractions with day info (for map)
 - `POST /api/chat` — AI chatbot (streaming SSE)
 
 ## Key Files
@@ -53,7 +62,7 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - `server/db.ts` — Database connection
 - `server/storage.ts` — Storage interface (DatabaseStorage)
 - `server/routes.ts` — Express API routes + file upload + AI chat
-- `client/src/pages/Home.tsx` — Main app (Itinerary, Hotels, Currency, Photos, Tips views)
+- `client/src/pages/Home.tsx` — Main app (7 tabs: Itinerary, Hotels, Map, Currency, Photos, Documents, Tips)
 - `client/src/components/AiChatBot.tsx` — Floating AI chatbot component
 - `client/src/main.tsx` — App entry + service worker registration
 - `client/public/sw.js` — Service worker (offline caching)

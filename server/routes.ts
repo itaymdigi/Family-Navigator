@@ -5,7 +5,7 @@ import { db } from "./db";
 import {
   insertTripDaySchema, insertDayEventSchema, insertAttractionSchema,
   insertAccommodationSchema, insertPhotoSchema, insertTipSchema,
-  insertFamilyMemberSchema,
+  insertFamilyMemberSchema, insertMapLocationSchema, insertTravelDocumentSchema,
   tripDays, dayEvents, attractions, accommodations, tips,
 } from "@shared/schema";
 import OpenAI from "openai";
@@ -223,6 +223,55 @@ export async function registerRoutes(
     if (!id) return res.status(400).json({ message: "Invalid id" });
     await storage.deleteFamilyMember(id);
     res.status(204).send();
+  });
+
+  // Map Locations
+  app.get("/api/map-locations", async (_req, res) => { res.json(await storage.getMapLocations()); });
+  app.post("/api/map-locations", async (req, res) => {
+    const p = insertMapLocationSchema.safeParse(req.body);
+    if (!p.success) return res.status(400).json({ message: p.error.message });
+    res.status(201).json(await storage.createMapLocation(p.data));
+  });
+  app.patch("/api/map-locations/:id", async (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ message: "Invalid id" });
+    res.json(await storage.updateMapLocation(id, req.body));
+  });
+  app.delete("/api/map-locations/:id", async (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ message: "Invalid id" });
+    await storage.deleteMapLocation(id);
+    res.status(204).send();
+  });
+
+  // Travel Documents
+  app.get("/api/travel-documents", async (_req, res) => { res.json(await storage.getTravelDocuments()); });
+  app.post("/api/travel-documents", async (req, res) => {
+    const p = insertTravelDocumentSchema.safeParse(req.body);
+    if (!p.success) return res.status(400).json({ message: p.error.message });
+    res.status(201).json(await storage.createTravelDocument(p.data));
+  });
+  app.patch("/api/travel-documents/:id", async (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ message: "Invalid id" });
+    res.json(await storage.updateTravelDocument(id, req.body));
+  });
+  app.delete("/api/travel-documents/:id", async (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ message: "Invalid id" });
+    await storage.deleteTravelDocument(id);
+    res.status(204).send();
+  });
+
+  // Get all attractions (for map view)
+  app.get("/api/all-attractions", async (_req, res) => {
+    const days = await storage.getTripDays();
+    const allAttractions = [];
+    for (const day of days) {
+      const attrs = await storage.getAttractions(day.id);
+      allAttractions.push(...attrs.map(a => ({ ...a, dayNumber: day.dayNumber, dayTitle: day.title })));
+    }
+    res.json(allAttractions);
   });
 
   const CHAT_MODELS = [
