@@ -8,22 +8,35 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { signIn } = useAuthActions();
 
+  // Transform plain username to a valid email format for Convex Auth
+  const toEmail = (u: string) => (u.includes("@") ? u : `${u}@family.nav`);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     setLoading(true);
     try {
+      const email = toEmail(username.trim());
       if (mode === "login") {
-        await signIn("password", { email: username, password, flow: "signIn" });
+        await signIn("password", { email, password, flow: "signIn" });
       } else {
-        await signIn("password", { email: username, password, flow: "signUp", name: displayName });
+        await signIn("password", { email, password, flow: "signUp", name: displayName });
       }
       toast({ title: mode === "login" ? "התחברת בהצלחה!" : "נרשמת בהצלחה!" });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "שגיאת שרת";
-      toast({ title: "שגיאה", description: message, variant: "destructive" });
+      const raw = err instanceof Error ? err.message : String(err);
+      // Map technical errors to friendly Hebrew messages
+      const msg =
+        raw === "InvalidSecret" ? "סיסמה שגויה. נסה שוב." :
+        raw === "InvalidAccountId" ? "משתמש לא נמצא. האם הרשמת?" :
+        raw === "TooManyFailedAttempts" ? "יותר מדי ניסיונות כושלים. נסה שוב מאוחר יותר." :
+        raw.includes("Invalid password") ? "הסיסמה חייבת להכיל לפחות 8 תווים." :
+        raw;
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -95,13 +108,19 @@ export default function AuthPage() {
                 data-testid="input-password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setError(null); }}
                 className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                placeholder="הכנס סיסמה"
+                placeholder="לפחות 8 תווים"
                 required
-                minLength={4}
+                minLength={8}
               />
             </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm font-medium text-right">
+                {error}
+              </div>
+            )}
 
             <button
               data-testid="button-submit-auth"
