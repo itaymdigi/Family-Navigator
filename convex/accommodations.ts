@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { requireAdmin } from "./lib/auth";
+import { requireAuth, requireAdmin } from "./lib/auth";
 
 export const list = query({
   args: { tripId: v.id("trips") },
@@ -22,6 +22,7 @@ export const list = query({
       isSelected: v.optional(v.boolean()),
       reservationUrl: v.optional(v.string()),
       reservationName: v.optional(v.string()),
+      reservationStorageId: v.optional(v.id("_storage")),
     })
   ),
   handler: async (ctx, { tripId }) => {
@@ -29,6 +30,15 @@ export const list = query({
       .query("accommodations")
       .withIndex("by_trip", (q) => q.eq("tripId", tripId))
       .collect();
+  },
+});
+
+export const generateUploadUrl = mutation({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => {
+    await requireAuth(ctx);
+    return await ctx.storage.generateUploadUrl();
   },
 });
 
@@ -48,6 +58,7 @@ export const create = mutation({
     isSelected: v.optional(v.boolean()),
     reservationUrl: v.optional(v.string()),
     reservationName: v.optional(v.string()),
+    reservationStorageId: v.optional(v.id("_storage")),
   },
   returns: v.id("accommodations"),
   handler: async (ctx, args) => {
@@ -72,11 +83,16 @@ export const update = mutation({
     isSelected: v.optional(v.boolean()),
     reservationUrl: v.optional(v.string()),
     reservationName: v.optional(v.string()),
+    reservationStorageId: v.optional(v.id("_storage")),
   },
   returns: v.null(),
-  handler: async (ctx, { id, ...fields }) => {
+  handler: async (ctx, { id, reservationStorageId, ...fields }) => {
     await requireAdmin(ctx);
-    await ctx.db.patch(id, fields);
+    if (reservationStorageId) {
+      const url = await ctx.storage.getUrl(reservationStorageId);
+      if (url) fields.reservationUrl = url;
+    }
+    await ctx.db.patch(id, { ...fields, reservationStorageId });
     return null;
   },
 });
@@ -86,6 +102,10 @@ export const remove = mutation({
   returns: v.null(),
   handler: async (ctx, { id }) => {
     await requireAdmin(ctx);
+    const doc = await ctx.db.get(id);
+    if (doc?.reservationStorageId) {
+      await ctx.storage.delete(doc.reservationStorageId);
+    }
     await ctx.db.delete(id);
     return null;
   },

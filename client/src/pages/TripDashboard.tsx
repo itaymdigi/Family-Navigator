@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useLocation } from "wouter";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../../convex/_generated/api";
-import { Loader2, Plus, MapPin, Calendar } from "lucide-react";
+import { Loader2, Plus, MapPin, Calendar, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ export default function TripDashboard() {
   const [saving, setSaving] = useState(false);
 
   const isAdmin = (currentUser as any)?.role === "admin";
+  const { signOut } = useAuthActions();
 
   const handleCreate = async () => {
     if (!form.name || !form.destination) return;
@@ -55,23 +57,32 @@ export default function TripDashboard() {
   }
 
   return (
-    <div dir="rtl" className="min-h-dvh bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
+    <div dir="rtl" className="min-h-dvh bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))", paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
       <div className="max-w-md mx-auto">
-        <div className="flex justify-between items-center mb-8 pt-6">
+        <div className="flex justify-between items-center mb-8 pt-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">הטיולים שלנו</h1>
             <p className="text-gray-500 text-sm mt-1">Family Navigator</p>
           </div>
-          {isAdmin && (
-            <Button
-              onClick={() => setShowNew(true)}
-              className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg hover:from-blue-600 hover:to-indigo-700 gap-2"
-              data-testid="button-new-trip"
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                onClick={() => setShowNew(true)}
+                className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg hover:from-blue-600 hover:to-indigo-700 gap-2"
+                data-testid="button-new-trip"
+              >
+                <Plus className="w-4 h-4" />
+                טיול חדש
+              </Button>
+            )}
+            <button
+              onClick={() => signOut()}
+              className="p-2 rounded-xl bg-white shadow-sm text-gray-400 hover:text-red-500 hover:shadow-md transition-all"
+              title="התנתק"
             >
-              <Plus className="w-4 h-4" />
-              טיול חדש
-            </Button>
-          )}
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {trips.length === 0 ? (

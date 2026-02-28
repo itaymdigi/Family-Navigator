@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { requireAdmin } from "./lib/auth";
+import { requireAuth, requireAdmin } from "./lib/auth";
 
 export const list = query({
   args: { tripId: v.id("trips") },
@@ -22,6 +22,7 @@ export const list = query({
       isKosher: v.optional(v.boolean()),
       isVisited: v.optional(v.boolean()),
       image: v.optional(v.string()),
+      imageStorageId: v.optional(v.id("_storage")),
     })
   ),
   handler: async (ctx, { tripId }) => {
@@ -29,6 +30,15 @@ export const list = query({
       .query("restaurants")
       .withIndex("by_trip", (q) => q.eq("tripId", tripId))
       .collect();
+  },
+});
+
+export const generateUploadUrl = mutation({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => {
+    await requireAuth(ctx);
+    return await ctx.storage.generateUploadUrl();
   },
 });
 
@@ -48,11 +58,17 @@ export const create = mutation({
     isKosher: v.optional(v.boolean()),
     isVisited: v.optional(v.boolean()),
     image: v.optional(v.string()),
+    imageStorageId: v.optional(v.id("_storage")),
   },
   returns: v.id("restaurants"),
-  handler: async (ctx, args) => {
+  handler: async (ctx, { imageStorageId, ...args }) => {
     await requireAdmin(ctx);
-    return await ctx.db.insert("restaurants", args);
+    let image = args.image;
+    if (imageStorageId) {
+      const url = await ctx.storage.getUrl(imageStorageId);
+      if (url) image = url;
+    }
+    return await ctx.db.insert("restaurants", { ...args, image, imageStorageId });
   },
 });
 
@@ -72,11 +88,16 @@ export const update = mutation({
     isKosher: v.optional(v.boolean()),
     isVisited: v.optional(v.boolean()),
     image: v.optional(v.string()),
+    imageStorageId: v.optional(v.id("_storage")),
   },
   returns: v.null(),
-  handler: async (ctx, { id, ...fields }) => {
+  handler: async (ctx, { id, imageStorageId, ...fields }) => {
     await requireAdmin(ctx);
-    await ctx.db.patch(id, fields);
+    if (imageStorageId) {
+      const url = await ctx.storage.getUrl(imageStorageId);
+      if (url) fields.image = url;
+    }
+    await ctx.db.patch(id, { ...fields, imageStorageId });
     return null;
   },
 });
@@ -86,6 +107,10 @@ export const remove = mutation({
   returns: v.null(),
   handler: async (ctx, { id }) => {
     await requireAdmin(ctx);
+    const doc = await ctx.db.get(id);
+    if (doc?.imageStorageId) {
+      await ctx.storage.delete(doc.imageStorageId);
+    }
     await ctx.db.delete(id);
     return null;
   },

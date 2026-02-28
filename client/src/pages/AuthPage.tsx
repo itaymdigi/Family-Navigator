@@ -30,12 +30,12 @@ export default function AuthPage() {
   }
 
   return (
-    <div dir="rtl" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
+    <div dir="rtl" className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 p-4" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-3">🇨🇿</div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-1">טיול משפחתי לצ׳כיה</h1>
-          <p className="text-gray-500">25.3 – 4.4.2026 · צפון צ׳כיה</p>
+          <div className="text-6xl mb-3">🧭</div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-1">Family Navigator</h1>
+          <p className="text-gray-500">אפליקציית הטיולים המשפחתית שלנו</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">

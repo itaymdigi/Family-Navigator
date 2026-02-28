@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, createContext, useContext } from "react";
 import { useQuery, useMutation } from "convex/react";
+import { useLocation } from "wouter";
 import {
   CalendarDays, Hotel, Calculator, Image as ImageIcon,
   MapPin, ExternalLink, Navigation, Clock, Star, Users,
@@ -7,7 +8,7 @@ import {
   Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi,
   Filter, Maximize2, Lock, Unlock, FileText, FolderOpen, Globe,
   Plane, CreditCard, FileCheck, MoreVertical, UtensilsCrossed,
-  MapPinned, ThumbsUp, ThumbsDown, LogOut, User
+  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, ArrowRight
 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -74,6 +75,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
   const countdown = useCountdown("2026-03-25T00:00:00");
   const currentUser = useQuery(api.users.me);
   const { signOut } = useAuthActions();
+  const [, navigate] = useLocation();
 
   const user = currentUser as (Doc<"users"> & { role?: string }) | null | undefined;
 
@@ -89,9 +91,9 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
 
   return (
     <AdminContext.Provider value={{ isAdmin, toggleAdmin }}>
-      <div className="min-h-screen bg-muted/50 flex justify-center selection:bg-primary/20" dir="rtl">
-        <div className="w-full max-w-md bg-background shadow-2xl min-h-screen relative flex flex-col pb-20 overflow-hidden sm:border-x sm:border-border">
-          <header className="pt-10 pb-6 px-6 bg-gradient-to-br from-primary via-primary to-[hsl(var(--primary)/0.85)] text-primary-foreground rounded-b-[2rem] shadow-lg z-10 relative">
+      <div className="min-h-dvh bg-muted/50 flex justify-center selection:bg-primary/20" dir="rtl">
+        <div className="w-full max-w-md bg-background shadow-2xl min-h-dvh relative flex flex-col overflow-hidden sm:border-x sm:border-border" style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}>
+          <header className="pb-6 px-6 bg-gradient-to-br from-primary via-primary to-[hsl(var(--primary)/0.85)] text-primary-foreground rounded-b-[2rem] shadow-lg z-10 relative" style={{ paddingTop: "calc(2.5rem + env(safe-area-inset-top))" }}>
             <div className="flex justify-between items-center mb-6">
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -100,9 +102,9 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
                 </div>
                 <p className="text-primary-foreground/90 text-sm font-medium">25.3 – 4.4.2026 · 11 ימים · 👨‍👩‍👦‍👦 4 נוסעים</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {!isOnline && (
-                  <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full" data-testid="offline-indicator">
+                  <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-2.5 py-1.5 rounded-full" data-testid="offline-indicator">
                     <CloudOff className="w-3.5 h-3.5" />
                     <span className="text-[11px] font-semibold">אופליין</span>
                   </div>
@@ -121,6 +123,13 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
                     {isAdmin ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
                   </button>
                 )}
+                <button
+                  onClick={() => navigate("/")}
+                  className="p-2 rounded-full bg-white/15 text-white/70 hover:bg-white/25 transition-all"
+                  title="חזור לרשימת הטיולים"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
                 <button
                   onClick={handleLogout}
                   className="p-2 rounded-full bg-white/15 text-white/70 hover:bg-red-500/30 hover:text-white transition-all"
@@ -181,15 +190,17 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
             {activeTab === "tips" && <TipsView tripId={tripId} />}
           </main>
 
-          <nav className="absolute bottom-0 left-0 w-full bg-white border-t border-border px-1 py-3 flex justify-between items-center rounded-t-3xl shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-20">
-            <NavItem icon={<CalendarDays className="w-4.5 h-4.5" />} label="מסלול" isActive={activeTab === "itinerary"} onClick={() => setActiveTab("itinerary")} />
-            <NavItem icon={<Hotel className="w-4.5 h-4.5" />} label="לינה" isActive={activeTab === "hotels"} onClick={() => setActiveTab("hotels")} />
-            <NavItem icon={<Globe className="w-4.5 h-4.5" />} label="מפה" isActive={activeTab === "map"} onClick={() => setActiveTab("map")} />
-            <NavItem icon={<Calculator className="w-4.5 h-4.5" />} label="מט״ח" isActive={activeTab === "currency"} onClick={() => setActiveTab("currency")} />
-            <NavItem icon={<ImageIcon className="w-4.5 h-4.5" />} label="תמונות" isActive={activeTab === "photos"} onClick={() => setActiveTab("photos")} />
-            <NavItem icon={<FolderOpen className="w-4.5 h-4.5" />} label="מסמכים" isActive={activeTab === "docs"} onClick={() => setActiveTab("docs")} />
-            <NavItem icon={<UtensilsCrossed className="w-4.5 h-4.5" />} label="אוכל" isActive={activeTab === "food"} onClick={() => setActiveTab("food")} />
-            <NavItem icon={<Lightbulb className="w-4.5 h-4.5" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
+          <nav className="absolute bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-border rounded-t-3xl shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.12)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+            <div className="flex items-center overflow-x-auto no-scrollbar px-2 py-2 gap-1">
+              <NavItem icon={<CalendarDays className="w-5 h-5" />} label="מסלול" isActive={activeTab === "itinerary"} onClick={() => setActiveTab("itinerary")} />
+              <NavItem icon={<Hotel className="w-5 h-5" />} label="לינה" isActive={activeTab === "hotels"} onClick={() => setActiveTab("hotels")} />
+              <NavItem icon={<Globe className="w-5 h-5" />} label="מפה" isActive={activeTab === "map"} onClick={() => setActiveTab("map")} />
+              <NavItem icon={<Calculator className="w-5 h-5" />} label="מט״ח" isActive={activeTab === "currency"} onClick={() => setActiveTab("currency")} />
+              <NavItem icon={<ImageIcon className="w-5 h-5" />} label="תמונות" isActive={activeTab === "photos"} onClick={() => setActiveTab("photos")} />
+              <NavItem icon={<FolderOpen className="w-5 h-5" />} label="מסמכים" isActive={activeTab === "docs"} onClick={() => setActiveTab("docs")} />
+              <NavItem icon={<UtensilsCrossed className="w-5 h-5" />} label="אוכל" isActive={activeTab === "food"} onClick={() => setActiveTab("food")} />
+              <NavItem icon={<Lightbulb className="w-5 h-5" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
+            </div>
           </nav>
         </div>
       </div>
@@ -199,10 +210,15 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
 
 function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode; label: string; isActive: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} data-testid={`nav-${label}`}
-      className={`flex flex-col items-center gap-0.5 transition-all duration-300 ease-out flex-1 min-w-0 ${isActive ? "text-primary scale-105" : "text-muted-foreground hover:text-foreground"}`}>
-      <div className={`${isActive ? "bg-primary/10 text-primary" : "text-muted-foreground"} p-1.5 rounded-xl transition-colors duration-300`}>{icon}</div>
-      <span className={`text-[9px] font-semibold ${isActive ? "opacity-100" : "opacity-70"} truncate max-w-full`}>{label}</span>
+    <button
+      onClick={onClick}
+      data-testid={`nav-${label}`}
+      className={`flex flex-col items-center gap-1 transition-all duration-200 ease-out flex-shrink-0 min-w-[4rem] px-1 py-0.5 rounded-2xl ${isActive ? "text-primary" : "text-muted-foreground active:scale-95"}`}
+    >
+      <div className={`p-2 rounded-2xl transition-all duration-200 ${isActive ? "bg-primary/12 text-primary shadow-sm" : "text-muted-foreground"}`}>
+        {icon}
+      </div>
+      <span className={`text-[10px] font-semibold leading-none ${isActive ? "text-primary" : "opacity-60"}`}>{label}</span>
     </button>
   );
 }
@@ -430,15 +446,31 @@ function HotelsView({ tripId }: { tripId: string }) {
   const [showDocDialog, setShowDocDialog] = useState<string | null>(null);
   const [docUrl, setDocUrl] = useState("");
   const [docName, setDocName] = useState("");
+  const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const deleteAccommodation = useMutation(api.accommodations.remove);
   const updateAccommodation = useMutation(api.accommodations.update);
+  const generateUploadUrl = useMutation(api.accommodations.generateUploadUrl);
+
+  const resetDialog = () => { setDocUrl(""); setDocName(""); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; };
 
   const handleUpdateReservation = async () => {
-    if (showDocDialog && docUrl) {
-      await updateAccommodation({ id: showDocDialog as Id<"accommodations">, reservationUrl: docUrl, reservationName: docName || "מסמך הזמנה" });
-      setShowDocDialog(null); setDocUrl(""); setDocName("");
-    }
+    if (!showDocDialog) return;
+    setSaving(true);
+    try {
+      if (uploadMode === "file" && selectedFile) {
+        const uploadUrl = await generateUploadUrl();
+        const result = await fetch(uploadUrl, { method: "POST", body: selectedFile, headers: { "Content-Type": selectedFile.type } });
+        const { storageId } = await result.json();
+        await updateAccommodation({ id: showDocDialog as Id<"accommodations">, reservationStorageId: storageId, reservationName: docName || selectedFile.name });
+      } else if (docUrl) {
+        await updateAccommodation({ id: showDocDialog as Id<"accommodations">, reservationUrl: docUrl, reservationName: docName || "מסמך הזמנה" });
+      }
+      setShowDocDialog(null); resetDialog();
+    } finally { setSaving(false); }
   };
 
   const handleRemoveReservation = async () => {
@@ -520,32 +552,53 @@ function HotelsView({ tripId }: { tripId: string }) {
         </div>
       ))}
 
-      <Dialog open={showDocDialog !== null} onOpenChange={(open) => { if (!open) { setShowDocDialog(null); setDocUrl(""); setDocName(""); } }}>
+      <Dialog open={showDocDialog !== null} onOpenChange={(open) => { if (!open) { setShowDocDialog(null); resetDialog(); } }}>
         <DialogContent className="max-w-[90vw] rounded-2xl max-h-[85vh] overflow-y-auto" dir="rtl">
           <DialogHeader><DialogTitle>צירוף מסמך הזמנה</DialogTitle></DialogHeader>
           <div className="space-y-3 pt-2">
-            <Input placeholder="שם המסמך (למשל: אישור הזמנה Booking)" value={docName} onChange={(e) => setDocName(e.target.value)} data-testid="input-reservation-name" />
-            <Input placeholder="קישור למסמך (URL)" value={docUrl} onChange={(e) => setDocUrl(e.target.value)} data-testid="input-reservation-url" />
+            <Input placeholder="שם המסמך (למשל: אישור הזמנה)" value={docName} onChange={(e) => setDocName(e.target.value)} data-testid="input-reservation-name" />
+            <div className="flex gap-2">
+              <button onClick={() => setUploadMode("file")} className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${uploadMode === "file" ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
+                <Upload className="w-3.5 h-3.5" /> העלאת קובץ
+              </button>
+              <button onClick={() => setUploadMode("url")} className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${uploadMode === "url" ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
+                <Link className="w-3.5 h-3.5" /> קישור URL
+              </button>
+            </div>
+            {uploadMode === "file" ? (
+              <div>
+                <input ref={fileInputRef} type="file" accept=".pdf,image/*" onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} className="hidden" />
+                {selectedFile ? (
+                  <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-xl border border-primary/20">
+                    <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+                    <span className="text-sm font-medium text-primary flex-1 truncate">{selectedFile.name}</span>
+                    <button onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="text-muted-foreground hover:text-red-500"><X className="w-4 h-4" /></button>
+                  </div>
+                ) : (
+                  <button onClick={() => fileInputRef.current?.click()} className="w-full h-24 border-2 border-dashed border-muted-foreground/30 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-primary/5 transition-colors">
+                    <Upload className="w-7 h-7 text-muted-foreground/40" />
+                    <span className="text-sm text-muted-foreground font-medium">לחצו לבחור PDF או תמונה</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <Input placeholder="קישור למסמך (URL)" value={docUrl} onChange={(e) => setDocUrl(e.target.value)} dir="ltr" data-testid="input-reservation-url" />
+            )}
             <div className="flex gap-2 pt-1">
               <Button
                 className="flex-1 h-10 text-sm rounded-xl bg-primary"
                 onClick={handleUpdateReservation}
-                disabled={!docUrl}
+                disabled={saving || (uploadMode === "file" ? !selectedFile : !docUrl)}
                 data-testid="button-save-reservation"
               >
-                שמור
+                {saving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null} שמור
               </Button>
               {showDocDialog && hotels?.find(h => h._id === showDocDialog)?.reservationUrl && (
-                <Button
-                  variant="outline"
-                  className="h-10 text-sm rounded-xl text-red-500 border-red-200 hover:bg-red-50"
-                  onClick={handleRemoveReservation}
-                  data-testid="button-remove-reservation"
-                >
+                <Button variant="outline" className="h-10 text-sm rounded-xl text-red-500 border-red-200 hover:bg-red-50" onClick={handleRemoveReservation} data-testid="button-remove-reservation">
                   <Trash2 className="w-3.5 h-3.5 ml-1" /> הסר
                 </Button>
               )}
-              <Button variant="outline" className="h-10 text-sm rounded-xl" onClick={() => { setShowDocDialog(null); setDocUrl(""); setDocName(""); }}>ביטול</Button>
+              <Button variant="outline" className="h-10 text-sm rounded-xl" onClick={() => { setShowDocDialog(null); resetDialog(); }}>ביטול</Button>
             </div>
           </div>
         </DialogContent>
@@ -1272,15 +1325,23 @@ function RestaurantsView({ tripId }: { tripId: string }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0, lat: "", lng: "" });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const addRestaurant = useMutation(api.restaurants.create);
   const updateRestaurant = useMutation(api.restaurants.update);
   const deleteRestaurant = useMutation(api.restaurants.remove);
+  const generateUploadUrl = useMutation(api.restaurants.generateUploadUrl);
   const [saving, setSaving] = useState(false);
 
   const displayRestaurants = restaurants ?? [];
 
-  const resetForm = () => setForm({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0, lat: "", lng: "" });
+  const resetForm = () => {
+    setForm({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0, lat: "", lng: "" });
+    setImageFile(null); setImagePreview(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
 
   const cuisineOptions = [
     { value: "czech", label: "צ'כית", icon: "🇨🇿" },
@@ -1302,6 +1363,13 @@ function RestaurantsView({ tripId }: { tripId: string }) {
     if (!form.name) return;
     setSaving(true);
     try {
+      let imageStorageId: string | undefined;
+      if (imageFile) {
+        const uploadUrl = await generateUploadUrl();
+        const result = await fetch(uploadUrl, { method: "POST", body: imageFile, headers: { "Content-Type": imageFile.type } });
+        const { storageId } = await result.json();
+        imageStorageId = storageId;
+      }
       const payload = {
         tripId: tripId as Id<"trips">,
         name: form.name,
@@ -1315,6 +1383,7 @@ function RestaurantsView({ tripId }: { tripId: string }) {
         rating: form.rating || undefined,
         lat: form.lat ? parseFloat(form.lat) : undefined,
         lng: form.lng ? parseFloat(form.lng) : undefined,
+        imageStorageId: imageStorageId as Id<"_storage"> | undefined,
       };
       if (editingId) {
         await updateRestaurant({ id: editingId as Id<"restaurants">, ...payload });
@@ -1365,6 +1434,7 @@ function RestaurantsView({ tripId }: { tripId: string }) {
             return (
               <Card key={r._id} className={`border-none shadow-sm rounded-xl group transition-all ${r.isVisited ? "bg-green-50/50" : "bg-white"}`} data-testid={`restaurant-${r._id}`}>
                 <CardContent className="p-3">
+                  {r.image && <div className="rounded-xl overflow-hidden h-32 mb-3"><img src={r.image} alt={r.name} className="w-full h-full object-cover" /></div>}
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-lg flex-shrink-0">
                       {ci.icon}
@@ -1495,6 +1565,27 @@ function RestaurantsView({ tripId }: { tripId: string }) {
               <input type="checkbox" checked={form.isKosher} onChange={(e) => setForm({ ...form, isKosher: e.target.checked })} className="rounded" data-testid="input-restaurant-kosher" />
               כשר
             </label>
+            {/* Image upload */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1.5">תמונת מסעדה (אופציונלי)</p>
+              <input ref={imageInputRef} type="file" accept="image/*" onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setImageFile(f);
+                if (f) { const r = new FileReader(); r.onload = () => setImagePreview(r.result as string); r.readAsDataURL(f); }
+                else setImagePreview(null);
+              }} className="hidden" data-testid="input-restaurant-image" />
+              {imagePreview ? (
+                <div className="relative rounded-xl overflow-hidden h-32">
+                  <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+                  <button onClick={() => { setImageFile(null); setImagePreview(null); if (imageInputRef.current) imageInputRef.current.value = ""; }} className="absolute top-2 left-2 bg-black/50 text-white rounded-full p-1"><X className="w-3.5 h-3.5" /></button>
+                </div>
+              ) : (
+                <button onClick={() => imageInputRef.current?.click()} className="w-full h-20 border-2 border-dashed border-muted-foreground/30 rounded-xl flex items-center justify-center gap-2 hover:border-primary/50 hover:bg-primary/5 transition-colors" data-testid="button-select-restaurant-image">
+                  <Camera className="w-5 h-5 text-muted-foreground/40" />
+                  <span className="text-xs text-muted-foreground">לחצו להוסיף תמונה</span>
+                </button>
+              )}
+            </div>
             <div className="flex gap-2 pt-1">
               <Button
                 className="flex-1 h-10 text-sm rounded-xl bg-primary"
