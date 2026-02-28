@@ -50,6 +50,25 @@ export const create = mutation({
   },
 });
 
+export const update = mutation({
+  args: {
+    id: v.id("attractions"),
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+    duration: v.optional(v.string()),
+    price: v.optional(v.string()),
+    mapsUrl: v.optional(v.string()),
+    wazeUrl: v.optional(v.string()),
+    badges: v.optional(v.array(v.string())),
+  },
+  returns: v.null(),
+  handler: async (ctx, { id, ...fields }) => {
+    await requireAdmin(ctx);
+    await ctx.db.patch(id, fields);
+    return null;
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("attractions") },
   returns: v.null(),

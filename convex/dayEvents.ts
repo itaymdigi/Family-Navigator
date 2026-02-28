@@ -39,6 +39,21 @@ export const create = mutation({
   },
 });
 
+export const update = mutation({
+  args: {
+    id: v.id("dayEvents"),
+    time: v.optional(v.string()),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, { id, ...fields }) => {
+    await requireAdmin(ctx);
+    await ctx.db.patch(id, fields);
+    return null;
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("dayEvents") },
   returns: v.null(),

@@ -97,6 +97,20 @@ export const update = mutation({
   },
 });
 
+export const clearReservation = mutation({
+  args: { id: v.id("accommodations") },
+  returns: v.null(),
+  handler: async (ctx, { id }) => {
+    await requireAdmin(ctx);
+    const doc = await ctx.db.get(id);
+    if (doc?.reservationStorageId) {
+      await ctx.storage.delete(doc.reservationStorageId);
+    }
+    await ctx.db.patch(id, { reservationUrl: undefined, reservationName: undefined, reservationStorageId: undefined });
+    return null;
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("accommodations") },
   returns: v.null(),

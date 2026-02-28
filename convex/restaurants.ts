@@ -102,6 +102,20 @@ export const update = mutation({
   },
 });
 
+export const clearImage = mutation({
+  args: { id: v.id("restaurants") },
+  returns: v.null(),
+  handler: async (ctx, { id }) => {
+    await requireAdmin(ctx);
+    const doc = await ctx.db.get(id);
+    if (doc?.imageStorageId) {
+      await ctx.storage.delete(doc.imageStorageId);
+    }
+    await ctx.db.patch(id, { image: undefined, imageStorageId: undefined });
+    return null;
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("restaurants") },
   returns: v.null(),

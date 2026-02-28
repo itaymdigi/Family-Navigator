@@ -12,8 +12,11 @@ export default function AuthPage() {
   const { toast } = useToast();
   const { signIn } = useAuthActions();
 
-  // Transform plain username to a valid email format for Convex Auth
-  const toEmail = (u: string) => (u.includes("@") ? u : `${u}@family.nav`);
+  // Normalize username: lowercase + trim + append domain if no @ present
+  const toEmail = (u: string) => {
+    const clean = u.trim().toLowerCase();
+    return clean.includes("@") ? clean : `${clean}@family.nav`;
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +32,6 @@ export default function AuthPage() {
       toast({ title: mode === "login" ? "התחברת בהצלחה!" : "נרשמת בהצלחה!" });
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : String(err);
-      // Map technical errors to friendly Hebrew messages
       const msg =
         raw === "InvalidSecret" ? "סיסמה שגויה. נסה שוב." :
         raw === "InvalidAccountId" ? "משתמש לא נמצא. האם הרשמת?" :
@@ -79,11 +81,16 @@ export default function AuthPage() {
               <input
                 data-testid="input-username"
                 type="text"
+                inputMode="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => { setUsername(e.target.value); setError(null); }}
                 className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 placeholder="הכנס שם משתמש"
                 required
+                autoComplete="username"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
               />
             </div>
 
@@ -98,6 +105,7 @@ export default function AuthPage() {
                   className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                   placeholder="השם שיוצג באפליקציה"
                   required
+                  autoComplete="name"
                 />
               </div>
             )}
@@ -113,6 +121,9 @@ export default function AuthPage() {
                 placeholder="לפחות 8 תווים"
                 required
                 minLength={8}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                autoCorrect="off"
+                autoCapitalize="none"
               />
             </div>
 
