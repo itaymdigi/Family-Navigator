@@ -1426,16 +1426,24 @@ function RestaurantsView() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 mt-2 justify-end">
-                    {r.mapsUrl && (
-                      <a href={r.mapsUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors" data-testid={`link-maps-${r.id}`}>
-                        Google Maps
-                      </a>
-                    )}
-                    {r.wazeUrl && (
-                      <a href={r.wazeUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-600 hover:bg-cyan-100 transition-colors" data-testid={`link-waze-${r.id}`}>
-                        Waze
-                      </a>
-                    )}
+                    {(() => {
+                      const mapsLink = r.mapsUrl || (r.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.address)}` : null);
+                      const wazeLink = r.wazeUrl || (r.address ? `https://waze.com/ul?q=${encodeURIComponent(r.address)}&navigate=yes` : null);
+                      return (
+                        <>
+                          {mapsLink && (
+                            <a href={mapsLink} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-1" data-testid={`link-maps-${r.id}`}>
+                              <Navigation className="w-3 h-3" /> Google Maps
+                            </a>
+                          )}
+                          {wazeLink && (
+                            <a href={wazeLink} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-600 hover:bg-cyan-100 transition-colors flex items-center gap-1" data-testid={`link-waze-${r.id}`}>
+                              <Navigation className="w-3 h-3" /> Waze
+                            </a>
+                          )}
+                        </>
+                      );
+                    })()}
                     {isAdmin && (
                       <>
                         <button
