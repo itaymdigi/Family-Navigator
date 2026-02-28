@@ -7,13 +7,14 @@ import {
   insertAccommodationSchema, insertPhotoSchema, insertTipSchema,
   insertFamilyMemberSchema, insertMapLocationSchema, insertTravelDocumentSchema,
   insertRestaurantSchema,
-  tripDays, dayEvents, attractions, accommodations, tips,
+  tripDays, dayEvents, attractions, accommodations, tips, users,
 } from "@shared/schema";
 import OpenAI from "openai";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
+import bcrypt from "bcryptjs";
 import { getUncachableGoogleDriveClient } from "./googleDrive";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -76,6 +77,48 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   app.use("/uploads", express.static(uploadsDir));
+
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { username, password, displayName } = req.body;
+      if (!username || !password || !displayName) return res.status(400).json({ message: "כל השדות נדרשים" });
+      if (password.length < 4) return res.status(400).json({ message: "סיסמה חייבת להכיל לפחות 4 תווים" });
+      const existing = await storage.getUserByUsername(username);
+      if (existing) return res.status(409).json({ message: "שם משתמש כבר קיים" });
+      const hashed = await bcrypt.hash(password, 10);
+      const allUsers = await db.select().from(users);
+      const role = allUsers.length === 0 ? "admin" : "viewer";
+      const user = await storage.createUser({ username, password: hashed, displayName, role });
+      req.session.userId = user.id;
+      res.json({ id: user.id, username: user.username, displayName: user.displayName, role: user.role });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) return res.status(400).json({ message: "שם משתמש וסיסמה נדרשים" });
+      const user = await storage.getUserByUsername(username);
+      if (!user) return res.status(401).json({ message: "שם משתמש או סיסמה שגויים" });
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) return res.status(401).json({ message: "שם משתמש או סיסמה שגויים" });
+      req.session.userId = user.id;
+      res.json({ id: user.id, username: user.username, displayName: user.displayName, role: user.role });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "לא מחובר" });
+    const user = await storage.getUserById(req.session.userId);
+    if (!user) return res.status(401).json({ message: "לא מחובר" });
+    res.json({ id: user.id, username: user.username, displayName: user.displayName, role: user.role });
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.json({ message: "התנתקת בהצלחה" });
+    });
+  });
 
   app.get("/api/trip-days", async (_req, res) => { res.json(await storage.getTripDays()); });
   app.post("/api/trip-days", async (req, res) => {

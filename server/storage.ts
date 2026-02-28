@@ -2,7 +2,7 @@ import { eq, asc } from "drizzle-orm";
 import { db } from "./db";
 import {
   tripDays, dayEvents, attractions, accommodations, photos, currencyRates, tips, familyMembers,
-  mapLocations, travelDocuments, restaurants,
+  mapLocations, travelDocuments, restaurants, users,
   type TripDay, type InsertTripDay,
   type DayEvent, type InsertDayEvent,
   type Attraction, type InsertAttraction,
@@ -14,6 +14,7 @@ import {
   type MapLocation, type InsertMapLocation,
   type TravelDocument, type InsertTravelDocument,
   type Restaurant, type InsertRestaurant,
+  type User, type InsertUser,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -67,6 +68,10 @@ export interface IStorage {
   createRestaurant(r: InsertRestaurant): Promise<Restaurant>;
   updateRestaurant(id: number, r: Partial<InsertRestaurant>): Promise<Restaurant>;
   deleteRestaurant(id: number): Promise<void>;
+
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserById(id: number): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -124,6 +129,10 @@ export class DatabaseStorage implements IStorage {
   async createRestaurant(r: InsertRestaurant) { const [res] = await db.insert(restaurants).values(r).returning(); return res; }
   async updateRestaurant(id: number, r: Partial<InsertRestaurant>) { const [res] = await db.update(restaurants).set(r).where(eq(restaurants.id, id)).returning(); return res; }
   async deleteRestaurant(id: number) { await db.delete(restaurants).where(eq(restaurants.id, id)); }
+
+  async getUserByUsername(username: string) { const [u] = await db.select().from(users).where(eq(users.username, username)); return u; }
+  async getUserById(id: number) { const [u] = await db.select().from(users).where(eq(users.id, id)); return u; }
+  async createUser(user: InsertUser) { const [r] = await db.insert(users).values(user).returning(); return r; }
 }
 
 export const storage = new DatabaseStorage();

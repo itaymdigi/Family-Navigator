@@ -7,8 +7,9 @@ import {
   Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi,
   Filter, Maximize2, Lock, Unlock, FileText, FolderOpen, Globe,
   Plane, CreditCard, FileCheck, MoreVertical, UtensilsCrossed,
-  MapPinned, ThumbsUp, ThumbsDown
+  MapPinned, ThumbsUp, ThumbsDown, LogOut, User
 } from "lucide-react";
+import { useAuth } from "@/App";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,30 +70,19 @@ function useCountdown(targetDate: string) {
 export default function Home() {
   const [activeTab, setActiveTab] = useState("itinerary");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [showPinDialog, setShowPinDialog] = useState(false);
-  const [pin, setPin] = useState("");
   const isOnline = useOnlineStatus();
   const countdown = useCountdown("2026-03-25T00:00:00");
-
-  const ADMIN_PIN = "1234";
+  const { user, refetch: refetchAuth } = useAuth();
 
   const toggleAdmin = () => {
-    if (isAdmin) {
-      setIsAdmin(false);
-    } else {
-      setShowPinDialog(true);
-      setPin("");
+    if (user?.role === "admin") {
+      setIsAdmin(!isAdmin);
     }
   };
 
-  const handlePinSubmit = () => {
-    if (pin === ADMIN_PIN) {
-      setIsAdmin(true);
-      setShowPinDialog(false);
-      setPin("");
-    } else {
-      setPin("");
-    }
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    refetchAuth();
   };
 
   return (
@@ -115,13 +105,27 @@ export default function Home() {
                     <span className="text-[11px] font-semibold">אופליין</span>
                   </div>
                 )}
+                <div className="flex items-center gap-1 bg-white/15 backdrop-blur-sm px-2 py-1 rounded-full">
+                  <User className="w-3 h-3" />
+                  <span className="text-[10px] font-medium" data-testid="text-username">{user?.displayName}</span>
+                </div>
+                {user?.role === "admin" && (
+                  <button
+                    onClick={toggleAdmin}
+                    className={`p-2 rounded-full transition-all ${isAdmin ? "bg-green-500/30 text-white" : "bg-white/15 text-white/70 hover:bg-white/25"}`}
+                    data-testid="button-toggle-admin"
+                    title={isAdmin ? "מצב עריכה פעיל" : "כניסה למצב עריכה"}
+                  >
+                    {isAdmin ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                  </button>
+                )}
                 <button
-                  onClick={toggleAdmin}
-                  className={`p-2 rounded-full transition-all ${isAdmin ? "bg-green-500/30 text-white" : "bg-white/15 text-white/70 hover:bg-white/25"}`}
-                  data-testid="button-toggle-admin"
-                  title={isAdmin ? "מצב עריכה פעיל" : "כניסה למצב עריכה"}
+                  onClick={handleLogout}
+                  className="p-2 rounded-full bg-white/15 text-white/70 hover:bg-red-500/30 hover:text-white transition-all"
+                  data-testid="button-logout"
+                  title="התנתק"
                 >
-                  {isAdmin ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                  <LogOut className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -186,29 +190,8 @@ export default function Home() {
             <NavItem icon={<Lightbulb className="w-4.5 h-4.5" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
           </nav>
 
-          <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
-            <DialogContent className="max-w-[85vw] rounded-2xl" dir="rtl">
-              <DialogHeader><DialogTitle>כניסה למצב עריכה</DialogTitle></DialogHeader>
-              <div className="space-y-4 pt-2">
-                <p className="text-sm text-muted-foreground">הזינו קוד PIN כדי לאפשר עריכה, הוספה ומחיקה</p>
-                <Input
-                  type="password"
-                  placeholder="קוד PIN"
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handlePinSubmit(); }}
-                  className="text-center text-2xl tracking-[0.5em] h-14"
-                  maxLength={4}
-                  data-testid="input-admin-pin"
-                  autoFocus
-                  dir="ltr"
-                />
-                <Button className="w-full rounded-xl bg-primary h-11" onClick={handlePinSubmit} disabled={pin.length < 4} data-testid="button-submit-pin">
-                  <Unlock className="w-4 h-4 ml-2" /> כניסה
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+
+
         </div>
       </div>
     </AdminContext.Provider>

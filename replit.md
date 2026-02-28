@@ -16,10 +16,13 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - **Direction**: RTL (Hebrew)
 
 ## Access Control
-- Admin mode protected by PIN (default: 1234)
-- Lock/unlock toggle in header
+- Username/password authentication with session-based login
+- First registered user automatically gets "admin" role
+- Subsequent users register as "viewer" role
+- Admin users can toggle edit mode (lock/unlock in header)
 - All CRUD operations (add, edit, delete) require admin mode
-- View-only mode by default for all visitors
+- Logout button in header; login/register screen gates the app
+- Passwords hashed with bcryptjs; sessions managed by express-session
 
 ## Design System ("Soft Pop")
 - **Primary**: Coral (#FF6B6B)
@@ -41,6 +44,7 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - `map_locations` — custom map pins (name, description, lat, lng, type, icon, dayId)
 - `travel_documents` — travel docs/links (name, type, url, notes, sortOrder)
 - `restaurants` — restaurant/food list (name, cuisine, priceRange, rating, address, lat/lng, mapsUrl, wazeUrl, notes, isKosher, isVisited, image)
+- `users` — user accounts (username, password hash, displayName, role: admin/viewer)
 - `conversations` / `messages` — AI chat history
 
 ## API Routes
@@ -58,6 +62,10 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - `GET/POST/PATCH/DELETE /api/travel-documents` — travel docs
 - `GET /api/all-attractions` — all attractions with day info (for map)
 - `GET/POST/PATCH/DELETE /api/restaurants` — CRUD for restaurants
+- `POST /api/auth/register` — register new user (first user = admin)
+- `POST /api/auth/login` — login
+- `GET /api/auth/me` — current session user
+- `POST /api/auth/logout` — logout
 - `POST /api/chat` — AI chatbot (streaming SSE)
 - `GET /api/gdrive/files?folderId=` — Google Drive file listing
 - `GET /api/gdrive/search?q=` — Google Drive file search
@@ -68,6 +76,7 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - `server/storage.ts` — Storage interface (DatabaseStorage)
 - `server/routes.ts` — Express API routes + file upload + AI chat
 - `client/src/pages/Home.tsx` — Main app (8 tabs: Itinerary, Hotels, Map, Currency, Photos, Documents, Food, Tips)
+- `client/src/pages/AuthPage.tsx` — Login/register screen
 - `client/src/components/AiChatBot.tsx` — Floating AI chatbot component
 - `client/src/main.tsx` — App entry + service worker registration
 - `client/public/sw.js` — Service worker (offline caching)

@@ -1,0 +1,125 @@
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+
+export default function AuthPage({ onAuth }: { onAuth: () => void }) {
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
+      const body: any = { username, password };
+      if (mode === "register") body.displayName = displayName;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "שגיאה", description: data.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: mode === "login" ? "התחברת בהצלחה!" : "נרשמת בהצלחה!" });
+      onAuth();
+    } catch {
+      toast({ title: "שגיאה", description: "שגיאת שרת", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div dir="rtl" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="text-6xl mb-3">🇨🇿</div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-1">טיול משפחתי לצ׳כיה</h1>
+          <p className="text-gray-500">25.3 – 4.4.2026 · צפון צ׳כיה</p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
+            <button
+              data-testid="tab-login"
+              onClick={() => setMode("login")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
+                mode === "login" ? "bg-white shadow text-blue-600" : "text-gray-500"
+              }`}
+            >
+              התחברות
+            </button>
+            <button
+              data-testid="tab-register"
+              onClick={() => setMode("register")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
+                mode === "register" ? "bg-white shadow text-blue-600" : "text-gray-500"
+              }`}
+            >
+              הרשמה
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">שם משתמש</label>
+              <input
+                data-testid="input-username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                placeholder="הכנס שם משתמש"
+                required
+              />
+            </div>
+
+            {mode === "register" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">שם תצוגה</label>
+                <input
+                  data-testid="input-displayname"
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  placeholder="השם שיוצג באפליקציה"
+                  required
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">סיסמה</label>
+              <input
+                data-testid="input-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                placeholder="הכנס סיסמה"
+                required
+                minLength={4}
+              />
+            </div>
+
+            <button
+              data-testid="button-submit-auth"
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-50 shadow-lg"
+            >
+              {loading ? "..." : mode === "login" ? "התחבר" : "הירשם"}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
