@@ -92,8 +92,8 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
 
   return (
     <AdminContext.Provider value={{ isAdmin, toggleAdmin }}>
-      <div className="min-h-dvh bg-muted/50 flex justify-center selection:bg-primary/20" dir="rtl">
-        <div className="w-full max-w-md bg-background shadow-2xl min-h-dvh relative flex flex-col overflow-hidden sm:border-x sm:border-border" style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}>
+      <div className="h-dvh bg-muted/50 flex justify-center selection:bg-primary/20 overflow-hidden" dir="rtl">
+        <div className="w-full max-w-md bg-background shadow-2xl h-dvh relative flex flex-col overflow-hidden sm:border-x sm:border-border" style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}>
           <header className="pb-6 px-6 bg-gradient-to-br from-primary via-primary to-[hsl(var(--primary)/0.85)] text-primary-foreground rounded-b-[2rem] shadow-lg z-10 relative" style={{ paddingTop: "calc(2.5rem + env(safe-area-inset-top))" }}>
             <div className="flex justify-between items-center mb-6">
               <div>
@@ -192,15 +192,15 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
           </main>
 
           <nav className="absolute bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-border rounded-t-3xl shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.12)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-            <div className="flex items-center overflow-x-auto no-scrollbar px-2 py-2 gap-1">
-              <NavItem icon={<CalendarDays className="w-5 h-5" />} label="מסלול" isActive={activeTab === "itinerary"} onClick={() => setActiveTab("itinerary")} />
-              <NavItem icon={<Hotel className="w-5 h-5" />} label="לינה" isActive={activeTab === "hotels"} onClick={() => setActiveTab("hotels")} />
-              <NavItem icon={<Globe className="w-5 h-5" />} label="מפה" isActive={activeTab === "map"} onClick={() => setActiveTab("map")} />
-              <NavItem icon={<Calculator className="w-5 h-5" />} label="מט״ח" isActive={activeTab === "currency"} onClick={() => setActiveTab("currency")} />
-              <NavItem icon={<ImageIcon className="w-5 h-5" />} label="תמונות" isActive={activeTab === "photos"} onClick={() => setActiveTab("photos")} />
-              <NavItem icon={<FolderOpen className="w-5 h-5" />} label="מסמכים" isActive={activeTab === "docs"} onClick={() => setActiveTab("docs")} />
-              <NavItem icon={<UtensilsCrossed className="w-5 h-5" />} label="אוכל" isActive={activeTab === "food"} onClick={() => setActiveTab("food")} />
-              <NavItem icon={<Lightbulb className="w-5 h-5" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
+            <div className="flex items-center px-1 py-1.5 gap-0.5">
+              <NavItem icon={<CalendarDays className="w-[18px] h-[18px]" />} label="מסלול" isActive={activeTab === "itinerary"} onClick={() => setActiveTab("itinerary")} />
+              <NavItem icon={<Hotel className="w-[18px] h-[18px]" />} label="לינה" isActive={activeTab === "hotels"} onClick={() => setActiveTab("hotels")} />
+              <NavItem icon={<Globe className="w-[18px] h-[18px]" />} label="מפה" isActive={activeTab === "map"} onClick={() => setActiveTab("map")} />
+              <NavItem icon={<Calculator className="w-[18px] h-[18px]" />} label="מט״ח" isActive={activeTab === "currency"} onClick={() => setActiveTab("currency")} />
+              <NavItem icon={<ImageIcon className="w-[18px] h-[18px]" />} label="תמונות" isActive={activeTab === "photos"} onClick={() => setActiveTab("photos")} />
+              <NavItem icon={<FolderOpen className="w-[18px] h-[18px]" />} label="מסמכים" isActive={activeTab === "docs"} onClick={() => setActiveTab("docs")} />
+              <NavItem icon={<UtensilsCrossed className="w-[18px] h-[18px]" />} label="אוכל" isActive={activeTab === "food"} onClick={() => setActiveTab("food")} />
+              <NavItem icon={<Lightbulb className="w-[18px] h-[18px]" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
             </div>
           </nav>
         </div>
@@ -214,12 +214,12 @@ function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode; la
     <button
       onClick={onClick}
       data-testid={`nav-${label}`}
-      className={`flex flex-col items-center gap-1 transition-all duration-200 ease-out flex-shrink-0 min-w-[4rem] px-1 py-0.5 rounded-2xl ${isActive ? "text-primary" : "text-muted-foreground active:scale-95"}`}
+      className={`flex flex-col items-center gap-0.5 transition-all duration-200 ease-out flex-1 min-w-0 py-0.5 rounded-2xl ${isActive ? "text-primary" : "text-muted-foreground active:scale-95"}`}
     >
-      <div className={`p-2 rounded-2xl transition-all duration-200 ${isActive ? "bg-primary/12 text-primary shadow-sm" : "text-muted-foreground"}`}>
+      <div className={`p-1.5 rounded-xl transition-all duration-200 ${isActive ? "bg-primary/12 text-primary shadow-sm" : "text-muted-foreground"}`}>
         {icon}
       </div>
-      <span className={`text-[10px] font-semibold leading-none ${isActive ? "text-primary" : "opacity-60"}`}>{label}</span>
+      <span className={`text-[9px] font-semibold leading-none truncate w-full text-center px-0.5 ${isActive ? "text-primary" : "opacity-60"}`}>{label}</span>
     </button>
   );
 }
@@ -382,7 +382,7 @@ function DayCard({ day, tripId }: { day: Doc<"tripDays">; tripId: string }) {
   return (
     <>
       <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white overflow-hidden" data-testid={`day-card-${day.dayNumber}`}>
-        <button onClick={() => setExpanded(!expanded)} className="w-full text-right" data-testid={`button-expand-day-${day.dayNumber}`}>
+        <div role="button" tabIndex={0} onClick={() => setExpanded(!expanded)} onKeyDown={(e) => e.key === "Enter" && setExpanded(!expanded)} className="w-full text-right cursor-pointer" data-testid={`button-expand-day-${day.dayNumber}`}>
           <CardContent className="p-4 flex items-center gap-3">
             <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold ${day.dayNumber === 0 || day.dayNumber === 10 ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
               <span className="text-[10px] leading-none font-semibold">יום</span>
@@ -417,7 +417,7 @@ function DayCard({ day, tripId }: { day: Doc<"tripDays">; tripId: string }) {
               {expanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
             </div>
           </CardContent>
-        </button>
+        </div>
         {expanded && (
           <div className="px-4 pb-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
             {day.weatherIcon && (
