@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, createContext, useContext } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "convex/react";
 import {
   CalendarDays, Hotel, Calculator, Image as ImageIcon,
   MapPin, ExternalLink, Navigation, Clock, Star, Users,
@@ -9,7 +9,7 @@ import {
   Plane, CreditCard, FileCheck, MoreVertical, UtensilsCrossed,
   MapPinned, ThumbsUp, ThumbsDown, LogOut, User
 } from "lucide-react";
-import { useAuth } from "@/App";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { TripDay, DayEvent, Attraction, Accommodation, Photo, CurrencyRate, Tip, FamilyMember, MapLocation, TravelDocument, Restaurant } from "@shared/schema";
+import { api } from "../../../convex/_generated/api";
+import type { Doc, Id } from "../../../convex/_generated/dataModel";
 
 const AdminContext = createContext<{ isAdmin: boolean; toggleAdmin: () => void }>({ isAdmin: false, toggleAdmin: () => {} });
 function useAdmin() { return useContext(AdminContext); }
@@ -67,12 +67,15 @@ function useCountdown(targetDate: string) {
   return timeLeft;
 }
 
-export default function Home() {
+export default function TripPlanner({ tripId }: { tripId: string }) {
   const [activeTab, setActiveTab] = useState("itinerary");
   const [isAdmin, setIsAdmin] = useState(false);
   const isOnline = useOnlineStatus();
   const countdown = useCountdown("2026-03-25T00:00:00");
-  const { user, refetch: refetchAuth } = useAuth();
+  const currentUser = useQuery(api.users.me);
+  const { signOut } = useAuthActions();
+
+  const user = currentUser as (Doc<"users"> & { role?: string }) | null | undefined;
 
   const toggleAdmin = () => {
     if (user?.role === "admin") {
@@ -81,8 +84,7 @@ export default function Home() {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    refetchAuth();
+    await signOut();
   };
 
   return (
@@ -107,7 +109,7 @@ export default function Home() {
                 )}
                 <div className="flex items-center gap-1 bg-white/15 backdrop-blur-sm px-2 py-1 rounded-full">
                   <User className="w-3 h-3" />
-                  <span className="text-[10px] font-medium" data-testid="text-username">{user?.displayName}</span>
+                  <span className="text-[10px] font-medium" data-testid="text-username">{user?.name ?? ""}</span>
                 </div>
                 {user?.role === "admin" && (
                   <button
@@ -169,14 +171,14 @@ export default function Home() {
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 space-y-4 z-0">
-            {activeTab === "itinerary" && <ItineraryView />}
-            {activeTab === "hotels" && <HotelsView />}
+            {activeTab === "itinerary" && <ItineraryView tripId={tripId} />}
+            {activeTab === "hotels" && <HotelsView tripId={tripId} />}
             {activeTab === "currency" && <CurrencyView />}
-            {activeTab === "map" && <MapView />}
-            {activeTab === "photos" && <PhotosView />}
-            {activeTab === "docs" && <DocsView />}
-            {activeTab === "food" && <RestaurantsView />}
-            {activeTab === "tips" && <TipsView />}
+            {activeTab === "map" && <MapView tripId={tripId} />}
+            {activeTab === "photos" && <PhotosView tripId={tripId} />}
+            {activeTab === "docs" && <DocsView tripId={tripId} />}
+            {activeTab === "food" && <RestaurantsView tripId={tripId} />}
+            {activeTab === "tips" && <TipsView tripId={tripId} />}
           </main>
 
           <nav className="absolute bottom-0 left-0 w-full bg-white border-t border-border px-1 py-3 flex justify-between items-center rounded-t-3xl shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-20">
@@ -189,9 +191,6 @@ export default function Home() {
             <NavItem icon={<UtensilsCrossed className="w-4.5 h-4.5" />} label="אוכל" isActive={activeTab === "food"} onClick={() => setActiveTab("food")} />
             <NavItem icon={<Lightbulb className="w-4.5 h-4.5" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
           </nav>
-
-
-
         </div>
       </div>
     </AdminContext.Provider>
@@ -231,28 +230,19 @@ function EditableField({ value, onSave, type = "text", className = "" }: { value
   );
 }
 
-function DayCard({ day }: { day: TripDay }) {
+function DayCard({ day, tripId }: { day: Doc<"tripDays">; tripId: string }) {
   const [expanded, setExpanded] = useState(false);
   const { isAdmin } = useAdmin();
-  const { data: events = [] } = useQuery<DayEvent[]>({ queryKey: ["/api/trip-days", String(day.id), "events"], enabled: expanded });
-  const { data: dayAttractions = [] } = useQuery<Attraction[]>({ queryKey: ["/api/trip-days", String(day.id), "attractions"], enabled: expanded });
+  const events = useQuery(api.dayEvents.listByDay, expanded ? { dayId: day._id } : "skip");
+  const dayAttractions = useQuery(api.attractions.listByDay, expanded ? { dayId: day._id } : "skip");
 
-  const updateDay = useMutation({
-    mutationFn: (data: any) => apiRequest("PATCH", `/api/trip-days/${day.id}`, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trip-days"] }),
-  });
-  const deleteDay = useMutation({
-    mutationFn: () => apiRequest("DELETE", `/api/trip-days/${day.id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trip-days"] }),
-  });
-  const deleteEvent = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/day-events/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trip-days", String(day.id), "events"] }),
-  });
-  const deleteAttr = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/attractions/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trip-days", String(day.id), "attractions"] }),
-  });
+  const updateDay = useMutation(api.tripDays.update);
+  const deleteDay = useMutation(api.tripDays.remove);
+  const deleteEvent = useMutation(api.dayEvents.remove);
+  const deleteAttr = useMutation(api.attractions.remove);
+
+  const displayEvents = events ?? [];
+  const displayAttractions = dayAttractions ?? [];
 
   return (
     <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white overflow-hidden" data-testid={`day-card-${day.dayNumber}`}>
@@ -296,7 +286,7 @@ function DayCard({ day }: { day: TripDay }) {
           )}
           {isAdmin && (
             <div className="flex gap-2 justify-end">
-              <button onClick={(e) => { e.stopPropagation(); deleteDay.mutate(); }} className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors" data-testid={`button-delete-day-${day.dayNumber}`}>
+              <button onClick={(e) => { e.stopPropagation(); deleteDay({ id: day._id }); }} className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors" data-testid={`button-delete-day-${day.dayNumber}`}>
                 <Trash2 className="w-3 h-3" /> מחק יום
               </button>
             </div>
@@ -311,19 +301,19 @@ function DayCard({ day }: { day: TripDay }) {
               ))}
             </div>
           )}
-          {events.length > 0 && (
+          {displayEvents.length > 0 && (
             <div className="relative">
               <div className="absolute right-[19px] top-2 bottom-2 w-0.5 bg-border"></div>
               <div className="space-y-3">
-                {events.map((event) => (
-                  <div key={event.id} className="flex gap-3 items-start relative group" data-testid={`event-${event.id}`}>
+                {displayEvents.map((event) => (
+                  <div key={event._id} className="flex gap-3 items-start relative group" data-testid={`event-${event._id}`}>
                     <div className="w-10 text-left flex-shrink-0"><span className="text-[11px] font-bold text-primary">{event.time}</span></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-primary border-2 border-white shadow-sm mt-1 flex-shrink-0 z-10"></div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm text-foreground">{event.title}</p>
                       {event.description && <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>}
                     </div>
-                    {isAdmin && <button onClick={() => deleteEvent.mutate(event.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-event-${event.id}`}>
+                    {isAdmin && <button onClick={() => deleteEvent({ id: event._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-event-${event._id}`}>
                       <Trash2 className="w-3 h-3" />
                     </button>}
                   </div>
@@ -331,12 +321,12 @@ function DayCard({ day }: { day: TripDay }) {
               </div>
             </div>
           )}
-          {isAdmin && <AddEventForm dayId={day.id} />}
-          {dayAttractions.length > 0 && (
+          {isAdmin && <AddEventForm dayId={day._id} />}
+          {displayAttractions.length > 0 && (
             <div className="space-y-3 pt-2">
               <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">אטרקציות</h4>
-              {dayAttractions.map((attr) => (
-                <AttractionCard key={attr.id} attraction={attr} dayId={day.id} onDelete={() => deleteAttr.mutate(attr.id)} />
+              {displayAttractions.map((attr) => (
+                <AttractionCard key={attr._id} attraction={attr} dayId={day._id} onDelete={() => deleteAttr({ id: attr._id })} />
               ))}
             </div>
           )}
@@ -346,18 +336,25 @@ function DayCard({ day }: { day: TripDay }) {
   );
 }
 
-function AddEventForm({ dayId }: { dayId: number }) {
+function AddEventForm({ dayId }: { dayId: Id<"tripDays"> }) {
   const [open, setOpen] = useState(false);
   const [time, setTime] = useState("");
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
-  const mutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/day-events", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trip-days", String(dayId), "events"] });
+  const createEvent = useMutation(api.dayEvents.create);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!time || !title) return;
+    setSaving(true);
+    try {
+      await createEvent({ dayId, time, title, description: desc || undefined, sortOrder: 99 });
       setOpen(false); setTime(""); setTitle(""); setDesc("");
-    },
-  });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!open) return (
     <button onClick={() => setOpen(true)} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 py-1" data-testid={`button-add-event-${dayId}`}>
       <Plus className="w-3 h-3" /> הוסף אירוע
@@ -371,8 +368,8 @@ function AddEventForm({ dayId }: { dayId: number }) {
       </div>
       <Input placeholder="תיאור (אופציונלי)" value={desc} onChange={(e) => setDesc(e.target.value)} className="h-8 text-xs" data-testid={`input-event-desc-${dayId}`} />
       <div className="flex gap-2">
-        <Button size="sm" className="h-7 text-xs rounded-lg bg-primary" onClick={() => mutation.mutate({ dayId, time, title, description: desc || null, sortOrder: 99 })} disabled={!time || !title || mutation.isPending} data-testid={`button-save-event-${dayId}`}>
-          {mutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "שמור"}
+        <Button size="sm" className="h-7 text-xs rounded-lg bg-primary" onClick={handleSave} disabled={!time || !title || saving} data-testid={`button-save-event-${dayId}`}>
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : "שמור"}
         </Button>
         <Button size="sm" variant="ghost" className="h-7 text-xs rounded-lg" onClick={() => setOpen(false)}>ביטול</Button>
       </div>
@@ -380,10 +377,10 @@ function AddEventForm({ dayId }: { dayId: number }) {
   );
 }
 
-function AttractionCard({ attraction, dayId, onDelete }: { attraction: Attraction; dayId: number; onDelete: () => void }) {
+function AttractionCard({ attraction, dayId, onDelete }: { attraction: Doc<"attractions">; dayId: Id<"tripDays">; onDelete: () => void }) {
   return (
-    <div className="bg-muted/40 rounded-xl p-3 space-y-2.5 group relative" data-testid={`attraction-${attraction.id}`}>
-      {useAdmin().isAdmin && <button onClick={onDelete} className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1.5 bg-white/80 rounded-lg transition-opacity z-10" data-testid={`button-delete-attr-${attraction.id}`}>
+    <div className="bg-muted/40 rounded-xl p-3 space-y-2.5 group relative" data-testid={`attraction-${attraction._id}`}>
+      {useAdmin().isAdmin && <button onClick={onDelete} className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1.5 bg-white/80 rounded-lg transition-opacity z-10" data-testid={`button-delete-attr-${attraction._id}`}>
         <Trash2 className="w-3 h-3" />
       </button>}
       {attraction.image && (
@@ -402,12 +399,12 @@ function AttractionCard({ attraction, dayId, onDelete }: { attraction: Attractio
       )}
       <div className="flex gap-2">
         {attraction.mapsUrl && (
-          <a href={attraction.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-maps-${attraction.id}`}>
+          <a href={attraction.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-maps-${attraction._id}`}>
             <Button size="sm" className="w-full rounded-lg bg-secondary hover:bg-secondary/90 text-white text-xs h-8 gap-1.5"><Navigation className="w-3 h-3" /> Google Maps</Button>
           </a>
         )}
         {attraction.wazeUrl && (
-          <a href={attraction.wazeUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-waze-${attraction.id}`}>
+          <a href={attraction.wazeUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-waze-${attraction._id}`}>
             <Button size="sm" variant="outline" className="w-full rounded-lg text-xs h-8 gap-1.5"><ExternalLink className="w-3 h-3" /> Waze</Button>
           </a>
         )}
@@ -416,44 +413,51 @@ function AttractionCard({ attraction, dayId, onDelete }: { attraction: Attractio
   );
 }
 
-function ItineraryView() {
-  const { data: days = [], isLoading } = useQuery<TripDay[]>({ queryKey: ["/api/trip-days"] });
-  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+function ItineraryView({ tripId }: { tripId: string }) {
+  const days = useQuery(api.tripDays.list, { tripId: tripId as Id<"trips"> });
+  if (days === undefined) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   return (
     <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
       <h2 className="text-lg font-bold text-foreground tracking-tight px-1">📅 מסלול יום-יומי</h2>
-      {days.map((day) => <DayCard key={day.id} day={day} />)}
+      {days.map((day) => <DayCard key={day._id} day={day} tripId={tripId} />)}
     </div>
   );
 }
 
-function HotelsView() {
+function HotelsView({ tripId }: { tripId: string }) {
   const { isAdmin } = useAdmin();
-  const { data: hotels = [], isLoading } = useQuery<Accommodation[]>({ queryKey: ["/api/accommodations"] });
-  const [showDocDialog, setShowDocDialog] = useState<number | null>(null);
+  const hotels = useQuery(api.accommodations.list, { tripId: tripId as Id<"trips"> });
+  const [showDocDialog, setShowDocDialog] = useState<string | null>(null);
   const [docUrl, setDocUrl] = useState("");
   const [docName, setDocName] = useState("");
-  const [showDrivePicker, setShowDrivePicker] = useState(false);
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/accommodations/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/accommodations"] }),
-  });
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/accommodations/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/accommodations"] }); setShowDocDialog(null); setDocUrl(""); setDocName(""); setShowDrivePicker(false); },
-  });
+  const deleteAccommodation = useMutation(api.accommodations.remove);
+  const updateAccommodation = useMutation(api.accommodations.update);
 
-  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-  const grouped = hotels.reduce((acc, h) => { const b = h.baseName || "אחר"; if (!acc[b]) acc[b] = []; acc[b].push(h); return acc; }, {} as Record<string, Accommodation[]>);
+  const handleUpdateReservation = async () => {
+    if (showDocDialog && docUrl) {
+      await updateAccommodation({ id: showDocDialog as Id<"accommodations">, reservationUrl: docUrl, reservationName: docName || "מסמך הזמנה" });
+      setShowDocDialog(null); setDocUrl(""); setDocName("");
+    }
+  };
+
+  const handleRemoveReservation = async () => {
+    if (showDocDialog) {
+      await updateAccommodation({ id: showDocDialog as Id<"accommodations">, reservationUrl: undefined, reservationName: undefined });
+      setShowDocDialog(null);
+    }
+  };
+
+  if (hotels === undefined) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  const grouped = hotels.reduce((acc, h) => { const b = h.baseName || "אחר"; if (!acc[b]) acc[b] = []; acc[b].push(h); return acc; }, {} as Record<string, typeof hotels>);
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
       <h2 className="text-lg font-bold text-foreground tracking-tight px-1">🏨 לינה</h2>
-      {Object.entries(grouped).map(([baseName, hotels]) => (
+      {Object.entries(grouped).map(([baseName, groupedHotels]) => (
         <div key={baseName} className="space-y-3">
           <h3 className="text-sm font-bold text-foreground/80 px-1">{baseName}</h3>
-          {hotels.map((hotel) => (
-            <Card key={hotel.id} className={`border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white overflow-hidden group ${hotel.isSelected ? "ring-2 ring-success/50" : ""}`} data-testid={`hotel-card-${hotel.id}`}>
+          {groupedHotels.map((hotel) => (
+            <Card key={hotel._id} className={`border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white overflow-hidden group ${hotel.isSelected ? "ring-2 ring-success/50" : ""}`} data-testid={`hotel-card-${hotel._id}`}>
               <CardContent className="p-4 space-y-3">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
@@ -461,11 +465,11 @@ function HotelsView() {
                       <h4 className="font-bold text-sm">{hotel.name}</h4>
                       {hotel.isSelected && <span className="bg-success/20 text-success-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">✅ הוזמן</span>}
                     </div>
-                    <div className="flex gap-0.5 mt-1">{Array.from({ length: hotel.stars }).map((_, i) => <Star key={i} className="w-3 h-3 fill-accent text-accent" />)}</div>
+                    <div className="flex gap-0.5 mt-1">{Array.from({ length: hotel.stars ?? 0 }).map((_, i) => <Star key={i} className="w-3 h-3 fill-accent text-accent" />)}</div>
                   </div>
                   <div className="flex items-center gap-1">
                     {hotel.priceRange && <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg">{hotel.priceRange}</span>}
-                    {isAdmin && <button onClick={() => deleteMutation.mutate(hotel.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-hotel-${hotel.id}`}>
+                    {isAdmin && <button onClick={() => deleteAccommodation({ id: hotel._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-hotel-${hotel._id}`}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>}
                   </div>
@@ -479,7 +483,7 @@ function HotelsView() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 p-2.5 rounded-xl bg-green-50 hover:bg-green-100 transition-colors"
-                    data-testid={`link-reservation-${hotel.id}`}
+                    data-testid={`link-reservation-${hotel._id}`}
                   >
                     <FileCheck className="w-4 h-4 text-green-600 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -491,20 +495,19 @@ function HotelsView() {
                 )}
 
                 <div className="flex gap-2">
-                  {hotel.mapsUrl && <a href={hotel.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-hotel-maps-${hotel.id}`}><Button size="sm" className="w-full rounded-lg bg-secondary hover:bg-secondary/90 text-white text-xs h-8 gap-1.5"><Navigation className="w-3 h-3" /> Maps</Button></a>}
-                  {hotel.wazeUrl && <a href={hotel.wazeUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-hotel-waze-${hotel.id}`}><Button size="sm" variant="outline" className="w-full rounded-lg text-xs h-8 gap-1.5"><ExternalLink className="w-3 h-3" /> Waze</Button></a>}
+                  {hotel.mapsUrl && <a href={hotel.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-hotel-maps-${hotel._id}`}><Button size="sm" className="w-full rounded-lg bg-secondary hover:bg-secondary/90 text-white text-xs h-8 gap-1.5"><Navigation className="w-3 h-3" /> Maps</Button></a>}
+                  {hotel.wazeUrl && <a href={hotel.wazeUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-hotel-waze-${hotel._id}`}><Button size="sm" variant="outline" className="w-full rounded-lg text-xs h-8 gap-1.5"><ExternalLink className="w-3 h-3" /> Waze</Button></a>}
                   {isAdmin && (
                     <Button
                       size="sm"
                       variant="outline"
                       className="rounded-lg text-xs h-8 gap-1.5 border-green-200 text-green-700 hover:bg-green-50"
                       onClick={() => {
-                        setShowDocDialog(hotel.id);
+                        setShowDocDialog(hotel._id);
                         setDocUrl(hotel.reservationUrl || "");
                         setDocName(hotel.reservationName || "");
-                        setShowDrivePicker(false);
                       }}
-                      data-testid={`button-add-reservation-${hotel.id}`}
+                      data-testid={`button-add-reservation-${hotel._id}`}
                     >
                       <FileCheck className="w-3 h-3" />
                       {hotel.reservationUrl ? "עדכן הזמנה" : "צרף הזמנה"}
@@ -517,60 +520,32 @@ function HotelsView() {
         </div>
       ))}
 
-      <Dialog open={showDocDialog !== null} onOpenChange={(open) => { if (!open) { setShowDocDialog(null); setDocUrl(""); setDocName(""); setShowDrivePicker(false); } }}>
+      <Dialog open={showDocDialog !== null} onOpenChange={(open) => { if (!open) { setShowDocDialog(null); setDocUrl(""); setDocName(""); } }}>
         <DialogContent className="max-w-[90vw] rounded-2xl max-h-[85vh] overflow-y-auto" dir="rtl">
           <DialogHeader><DialogTitle>צירוף מסמך הזמנה</DialogTitle></DialogHeader>
           <div className="space-y-3 pt-2">
             <Input placeholder="שם המסמך (למשל: אישור הזמנה Booking)" value={docName} onChange={(e) => setDocName(e.target.value)} data-testid="input-reservation-name" />
             <Input placeholder="קישור למסמך (URL)" value={docUrl} onChange={(e) => setDocUrl(e.target.value)} data-testid="input-reservation-url" />
-            <div className="text-center text-[11px] text-muted-foreground">— או —</div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full rounded-xl text-xs h-9 border-green-200 text-green-700 hover:bg-green-50"
-              onClick={() => setShowDrivePicker(!showDrivePicker)}
-              data-testid="button-pick-from-drive"
-            >
-              <FolderOpen className="w-3.5 h-3.5 ml-2" />
-              {showDrivePicker ? "הסתר Google Drive" : "בחר מ-Google Drive"}
-            </Button>
-            {showDrivePicker && (
-              <div className="border border-green-200 rounded-xl p-3">
-                <GDriveFileBrowser onSelect={(file: any) => {
-                  setDocUrl(file.webViewLink || "");
-                  setDocName(file.name || "");
-                  setShowDrivePicker(false);
-                }} />
-              </div>
-            )}
             <div className="flex gap-2 pt-1">
               <Button
                 className="flex-1 h-10 text-sm rounded-xl bg-primary"
-                onClick={() => {
-                  if (showDocDialog && docUrl) {
-                    updateMutation.mutate({ id: showDocDialog, data: { reservationUrl: docUrl, reservationName: docName || "מסמך הזמנה" } });
-                  }
-                }}
-                disabled={!docUrl || updateMutation.isPending}
+                onClick={handleUpdateReservation}
+                disabled={!docUrl}
                 data-testid="button-save-reservation"
               >
-                {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "שמור"}
+                שמור
               </Button>
-              {showDocDialog && hotels.find(h => h.id === showDocDialog)?.reservationUrl && (
+              {showDocDialog && hotels?.find(h => h._id === showDocDialog)?.reservationUrl && (
                 <Button
                   variant="outline"
                   className="h-10 text-sm rounded-xl text-red-500 border-red-200 hover:bg-red-50"
-                  onClick={() => {
-                    if (showDocDialog) {
-                      updateMutation.mutate({ id: showDocDialog, data: { reservationUrl: null, reservationName: null } });
-                    }
-                  }}
+                  onClick={handleRemoveReservation}
                   data-testid="button-remove-reservation"
                 >
                   <Trash2 className="w-3.5 h-3.5 ml-1" /> הסר
                 </Button>
               )}
-              <Button variant="outline" className="h-10 text-sm rounded-xl" onClick={() => { setShowDocDialog(null); setDocUrl(""); setDocName(""); setShowDrivePicker(false); }}>ביטול</Button>
+              <Button variant="outline" className="h-10 text-sm rounded-xl" onClick={() => { setShowDocDialog(null); setDocUrl(""); setDocName(""); }}>ביטול</Button>
             </div>
           </div>
         </DialogContent>
@@ -580,10 +555,11 @@ function HotelsView() {
 }
 
 function CurrencyView() {
-  const { data: rates = [] } = useQuery<CurrencyRate[]>({ queryKey: ["/api/currency-rates"] });
+  const rates = useQuery(api.currencyRates.list);
   const [amount, setAmount] = useState("100");
   const [fromCurrency, setFromCurrency] = useState("CZK");
-  const filteredRates = rates.filter((r) => r.fromCurrency === fromCurrency);
+  const displayRates = rates ?? [];
+  const filteredRates = displayRates.filter((r) => r.fromCurrency === fromCurrency);
   const quickAmounts = fromCurrency === "CZK" ? [50, 100, 200, 500, 1000, 2000] : fromCurrency === "EUR" ? [5, 10, 20, 50, 100, 200] : [10, 20, 50, 100, 200, 500];
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
@@ -612,7 +588,7 @@ function CurrencyView() {
           {filteredRates.length > 0 && (
             <div className="space-y-3 pt-2">
               {filteredRates.map((r) => (
-                <div key={r.id} className="flex items-center justify-between p-3 bg-success/10 rounded-xl" data-testid={`rate-result-${r.id}`}>
+                <div key={r._id} className="flex items-center justify-between p-3 bg-success/10 rounded-xl" data-testid={`rate-result-${r._id}`}>
                   <div className="flex items-center gap-2"><span className="text-xl">{r.flag}</span><p className="text-xs text-muted-foreground">1 {r.fromCurrency} = {r.rate} {r.toCurrency}</p></div>
                   <div className="text-left"><p className="font-bold text-lg" dir="ltr">{(Number(amount) * r.rate).toFixed(2)}</p><p className="text-[10px] text-muted-foreground font-medium">{r.toCurrency}</p></div>
                 </div>
@@ -626,24 +602,30 @@ function CurrencyView() {
   );
 }
 
-function PhotosView() {
+function PhotosView({ tripId }: { tripId: string }) {
   const { isAdmin } = useAdmin();
-  const { data: photos = [], isLoading } = useQuery<Photo[]>({ queryKey: ["/api/photos"] });
-  const { data: members = [] } = useQuery<FamilyMember[]>({ queryKey: ["/api/family-members"] });
+  const photos = useQuery(api.photos.list, { tripId: tripId as Id<"trips"> });
+  const members = useQuery(api.familyMembers.list, { tripId: tripId as Id<"trips"> });
   const [showAdd, setShowAdd] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
-  const [newPhoto, setNewPhoto] = useState({ url: "", caption: "", uploadedBy: null as number | null, category: "general" });
+  const [newPhoto, setNewPhoto] = useState({ url: "", caption: "", uploadedBy: null as string | null, category: "general" });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<Doc<"photos"> | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>("הכל");
 
-  const categories = ["הכל", "נופים", "אוכל", "משפחה", "אטרקציות"];
+  const generateUploadUrl = useMutation(api.photos.generateUploadUrl);
+  const createPhoto = useMutation(api.photos.create);
+  const deletePhoto = useMutation(api.photos.remove);
 
-  const filteredPhotos = photos.filter(p => 
+  const categories = ["הכל", "נופים", "אוכל", "משפחה", "אטרקציות"];
+  const displayPhotos = photos ?? [];
+  const displayMembers = members ?? [];
+
+  const filteredPhotos = displayPhotos.filter(p =>
     filterCategory === "הכל" || p.category === filterCategory
   );
 
@@ -665,8 +647,7 @@ function PhotosView() {
 
   const handleUpload = async () => {
     if (uploadMode === "url") {
-      await apiRequest("POST", "/api/photos", newPhoto);
-      queryClient.invalidateQueries({ queryKey: ["/api/photos"] });
+      await createPhoto({ tripId: tripId as Id<"trips">, url: newPhoto.url, caption: newPhoto.caption, category: newPhoto.category });
       setShowAdd(false);
       resetForm();
       return;
@@ -674,14 +655,10 @@ function PhotosView() {
     if (!selectedFile || !newPhoto.caption) return;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("photo", selectedFile);
-      formData.append("caption", newPhoto.caption);
-      formData.append("category", newPhoto.category || "general");
-      if (newPhoto.uploadedBy) formData.append("uploadedBy", String(newPhoto.uploadedBy));
-      const res = await fetch("/api/photos/upload", { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Upload failed");
-      queryClient.invalidateQueries({ queryKey: ["/api/photos"] });
+      const uploadUrl = await generateUploadUrl();
+      const result = await fetch(uploadUrl, { method: "POST", body: selectedFile, headers: { "Content-Type": selectedFile.type } });
+      const { storageId } = await result.json();
+      await createPhoto({ tripId: tripId as Id<"trips">, storageId, caption: newPhoto.caption, category: newPhoto.category });
       setShowAdd(false);
       resetForm();
     } catch (err) {
@@ -691,16 +668,11 @@ function PhotosView() {
     }
   };
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/photos/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/photos"] }),
-  });
+  if (photos === undefined) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>;
 
-  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>;
-
-  const getMemberName = (id: number | null) => {
+  const getMemberName = (id: string | null) => {
     if (!id) return null;
-    return members.find((m) => m.id === id);
+    return displayMembers.find((m) => m._id === id);
   };
 
   const canSave = uploadMode === "file" ? (!!selectedFile && !!newPhoto.caption) : (!!newPhoto.url && !!newPhoto.caption);
@@ -718,7 +690,7 @@ function PhotosView() {
             </DialogTrigger>
             <DialogContent className="max-w-[90vw] rounded-2xl" dir="rtl">
               <DialogHeader><DialogTitle>בני משפחה</DialogTitle></DialogHeader>
-              <FamilyMembersManager />
+              <FamilyMembersManager tripId={tripId} />
             </DialogContent>
           </Dialog>}
           {isAdmin && <Dialog open={showAdd} onOpenChange={(o) => { setShowAdd(o); if (!o) resetForm(); }}>
@@ -777,14 +749,14 @@ function PhotosView() {
                   <Label>כיתוב</Label>
                   <Input placeholder="תיאור..." value={newPhoto.caption} onChange={(e) => setNewPhoto({ ...newPhoto, caption: e.target.value })} data-testid="input-photo-caption" />
                 </div>
-                {members.length > 0 && (
+                {displayMembers.length > 0 && (
                   <div className="space-y-2">
                     <Label>מי העלה?</Label>
-                    <Select value={newPhoto.uploadedBy ? String(newPhoto.uploadedBy) : "none"} onValueChange={(v) => setNewPhoto({ ...newPhoto, uploadedBy: v === "none" ? null : Number(v) })}>
+                    <Select value={newPhoto.uploadedBy || "none"} onValueChange={(v) => setNewPhoto({ ...newPhoto, uploadedBy: v === "none" ? null : v })}>
                       <SelectTrigger data-testid="select-photo-uploader"><SelectValue placeholder="בחר..." /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">ללא</SelectItem>
-                        {members.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>)}
+                        {displayMembers.map((m) => <SelectItem key={m._id} value={m._id}>{m.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -804,8 +776,8 @@ function PhotosView() {
             key={cat}
             onClick={() => setFilterCategory(cat)}
             className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${
-              filterCategory === cat 
-                ? "bg-primary text-white shadow-sm scale-105" 
+              filterCategory === cat
+                ? "bg-primary text-white shadow-sm scale-105"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
           >
@@ -814,11 +786,11 @@ function PhotosView() {
         ))}
       </div>
 
-      {members.length > 0 && (
+      {displayMembers.length > 0 && (
         <div className="flex gap-2 px-1 overflow-x-auto pb-1 mb-2">
-          {members.map((m) => (
-            <div key={m.id} className="flex flex-col items-center gap-1 flex-shrink-0">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: m.color }} data-testid={`member-avatar-${m.id}`}>
+          {displayMembers.map((m) => (
+            <div key={m._id} className="flex flex-col items-center gap-1 flex-shrink-0">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: m.color }} data-testid={`member-avatar-${m._id}`}>
                 {m.avatar || m.name[0]}
               </div>
               <span className="text-[10px] text-muted-foreground font-medium">{m.name}</span>
@@ -835,12 +807,12 @@ function PhotosView() {
       ) : (
         <div className="grid grid-cols-2 gap-3">
           {filteredPhotos.map((photo, i) => {
-            const member = getMemberName(photo.uploadedBy);
+            const member = getMemberName(photo.uploadedBy ?? null);
             return (
-              <div 
-                key={photo.id} 
-                className={`rounded-2xl overflow-hidden shadow-sm relative group cursor-pointer bg-muted ${i % 5 === 0 ? "col-span-2 aspect-video" : "aspect-square"}`} 
-                data-testid={`photo-${photo.id}`}
+              <div
+                key={photo._id}
+                className={`rounded-2xl overflow-hidden shadow-sm relative group cursor-pointer bg-muted ${i % 5 === 0 ? "col-span-2 aspect-video" : "aspect-square"}`}
+                data-testid={`photo-${photo._id}`}
                 onClick={() => setSelectedPhoto(photo)}
               >
                 <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
@@ -851,7 +823,7 @@ function PhotosView() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3">
                   <span className="text-white text-xs font-semibold">{photo.caption}</span>
-                  {isAdmin && <button onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(photo.id); }} className="text-white/80 hover:text-red-400 p-1" data-testid={`button-delete-photo-${photo.id}`}><Trash2 className="w-4 h-4" /></button>}
+                  {isAdmin && <button onClick={(e) => { e.stopPropagation(); deletePhoto({ id: photo._id }); }} className="text-white/80 hover:text-red-400 p-1" data-testid={`button-delete-photo-${photo._id}`}><Trash2 className="w-4 h-4" /></button>}
                 </div>
               </div>
             );
@@ -867,15 +839,15 @@ function PhotosView() {
               <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white text-right">
                 <p className="font-bold text-xl mb-1">{selectedPhoto.caption}</p>
                 <div className="flex items-center gap-2 opacity-80 text-sm">
-                  {getMemberName(selectedPhoto.uploadedBy) && (
-                    <span>הועלה על ידי: {getMemberName(selectedPhoto.uploadedBy)?.name}</span>
+                  {getMemberName(selectedPhoto.uploadedBy ?? null) && (
+                    <span>הועלה על ידי: {getMemberName(selectedPhoto.uploadedBy ?? null)?.name}</span>
                   )}
                   <span>•</span>
                   <span>{selectedPhoto.category === "general" ? "כללי" : selectedPhoto.category}</span>
                 </div>
               </div>
-              <button 
-                onClick={() => setSelectedPhoto(null)} 
+              <button
+                onClick={() => setSelectedPhoto(null)}
                 className="absolute top-10 right-6 text-white/80 hover:text-white bg-white/10 backdrop-blur-md rounded-full p-2.5 z-50 transition-all hover:bg-white/20"
               >
                 <X className="w-6 h-6" />
@@ -888,34 +860,31 @@ function PhotosView() {
   );
 }
 
-function FamilyMembersManager() {
-  const { data: members = [] } = useQuery<FamilyMember[]>({ queryKey: ["/api/family-members"] });
+function FamilyMembersManager({ tripId }: { tripId: string }) {
+  const members = useQuery(api.familyMembers.list, { tripId: tripId as Id<"trips"> });
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState("");
   const colors = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#6C5CE7", "#FD79A8", "#00B894", "#E17055"];
   const [color, setColor] = useState(colors[0]);
 
-  const addMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/family-members", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/family-members"] }); setName(""); setAvatar(""); },
-  });
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/family-members/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/family-members"] }),
-  });
+  const addMember = useMutation(api.familyMembers.create);
+  const deleteMember = useMutation(api.familyMembers.remove);
+  const [saving, setSaving] = useState(false);
+
+  const displayMembers = members ?? [];
 
   return (
     <div className="space-y-4 pt-2">
       <div className="space-y-3">
-        {members.map((m) => (
-          <div key={m.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl" data-testid={`member-row-${m.id}`}>
+        {displayMembers.map((m) => (
+          <div key={m._id} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl" data-testid={`member-row-${m._id}`}>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: m.color }}>
                 {m.avatar || m.name[0]}
               </div>
               <span className="font-medium text-sm">{m.name}</span>
             </div>
-            <button onClick={() => deleteMutation.mutate(m.id)} className="text-red-400 hover:text-red-600 p-1" data-testid={`button-delete-member-${m.id}`}><Trash2 className="w-4 h-4" /></button>
+            <button onClick={() => deleteMember({ id: m._id })} className="text-red-400 hover:text-red-600 p-1" data-testid={`button-delete-member-${m._id}`}><Trash2 className="w-4 h-4" /></button>
           </div>
         ))}
       </div>
@@ -929,33 +898,41 @@ function FamilyMembersManager() {
             <button key={c} onClick={() => setColor(c)} className={`w-8 h-8 rounded-full transition-all ${color === c ? "ring-2 ring-offset-2 ring-foreground scale-110" : ""}`} style={{ backgroundColor: c }} data-testid={`button-color-${c}`} />
           ))}
         </div>
-        <Button className="w-full rounded-xl bg-primary h-9 text-sm" onClick={() => addMutation.mutate({ name, avatar: avatar || null, color })} disabled={!name || addMutation.isPending} data-testid="button-add-member">
-          {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />} הוסף בן משפחה
+        <Button
+          className="w-full rounded-xl bg-primary h-9 text-sm"
+          onClick={async () => {
+            if (!name) return;
+            setSaving(true);
+            try { await addMember({ tripId: tripId as Id<"trips">, name, avatar: avatar || undefined, color }); setName(""); setAvatar(""); }
+            finally { setSaving(false); }
+          }}
+          disabled={!name || saving}
+          data-testid="button-add-member"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />} הוסף בן משפחה
         </Button>
       </div>
     </div>
   );
 }
 
-function MapView() {
+function MapView({ tripId }: { tripId: string }) {
   const { isAdmin } = useAdmin();
-  const { data: locations = [], isLoading: locsLoading } = useQuery<MapLocation[]>({ queryKey: ["/api/map-locations"] });
-  const { data: allAttractions = [] } = useQuery<(Attraction & { dayNumber: number; dayTitle: string })[]>({ queryKey: ["/api/all-attractions"] });
-  const { data: hotels = [] } = useQuery<Accommodation[]>({ queryKey: ["/api/accommodations"] });
-  const { data: restaurantsList = [] } = useQuery<Restaurant[]>({ queryKey: ["/api/restaurants"] });
+  const locations = useQuery(api.mapLocations.list, { tripId: tripId as Id<"trips"> });
+  const hotels = useQuery(api.accommodations.list, { tripId: tripId as Id<"trips"> });
+  const restaurantsList = useQuery(api.restaurants.list, { tripId: tripId as Id<"trips"> });
   const [showAdd, setShowAdd] = useState(false);
   const [newLoc, setNewLoc] = useState({ name: "", description: "", lat: "", lng: "", type: "attraction", icon: "" });
   const mapRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
 
-  const addMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/map-locations", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/map-locations"] }); setShowAdd(false); setNewLoc({ name: "", description: "", lat: "", lng: "", type: "attraction", icon: "" }); },
-  });
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/map-locations/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/map-locations"] }),
-  });
+  const addLocation = useMutation(api.mapLocations.create);
+  const deleteLocation = useMutation(api.mapLocations.remove);
+  const [saving, setSaving] = useState(false);
+
+  const displayLocations = locations ?? [];
+  const displayHotels = hotels ?? [];
+  const displayRestaurants = restaurantsList ?? [];
 
   useEffect(() => {
     if (mapRef.current || !document.getElementById("trip-map")) return;
@@ -984,20 +961,11 @@ function MapView() {
       if (layer instanceof L.Marker) map.removeLayer(layer);
     });
 
-    const attractionIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#FF6B6B;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🏰</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
     const hotelIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#4ECDC4;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🏨</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
     const restaurantIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#F59E0B;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🍽️</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
     const customIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#6C5CE7;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">📍</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
 
-    allAttractions.forEach((attr) => {
-      if (attr.lat && attr.lng) {
-        L.marker([attr.lat, attr.lng], { icon: attractionIcon })
-          .addTo(map)
-          .bindPopup(`<div dir="rtl" style="text-align:right"><b>${attr.name}</b><br/><small>יום ${attr.dayNumber}</small><br/>${attr.description || ""}</div>`);
-      }
-    });
-
-    hotels.forEach((hotel) => {
+    displayHotels.forEach((hotel) => {
       if (hotel.lat && hotel.lng) {
         L.marker([hotel.lat, hotel.lng], { icon: hotelIcon })
           .addTo(map)
@@ -1005,14 +973,14 @@ function MapView() {
       }
     });
 
-    locations.forEach((loc) => {
+    displayLocations.forEach((loc) => {
       const icon = loc.icon ? L.divIcon({ className: "custom-marker", html: `<div style="background:#6C5CE7;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${loc.icon}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] }) : customIcon;
       L.marker([loc.lat, loc.lng], { icon })
         .addTo(map)
         .bindPopup(`<div dir="rtl" style="text-align:right"><b>${loc.name}</b><br/>${loc.description || ""}</div>`);
     });
 
-    restaurantsList.forEach((rest) => {
+    displayRestaurants.forEach((rest) => {
       if (rest.lat && rest.lng) {
         const navUrl = rest.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rest.address || rest.name)}`;
         L.marker([rest.lat, rest.lng], { icon: restaurantIcon })
@@ -1020,7 +988,7 @@ function MapView() {
           .bindPopup(`<div dir="rtl" style="text-align:right"><b>🍽️ ${rest.name}</b>${rest.cuisine ? `<br/><small>${rest.cuisine}</small>` : ""}${rest.priceRange ? `<br/><small>${rest.priceRange}</small>` : ""}${rest.notes ? `<br/><small>${rest.notes}</small>` : ""}<br/><a href="${navUrl}" target="_blank" style="color:#2563eb;font-size:12px;">נווט למסעדה →</a></div>`);
       }
     });
-  }, [mapReady, allAttractions, hotels, locations, restaurantsList]);
+  }, [mapReady, displayHotels, displayLocations, displayRestaurants]);
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
@@ -1038,17 +1006,16 @@ function MapView() {
       </Card>
 
       <div className="flex gap-2 flex-wrap px-1">
-        <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#FF6B6B] inline-block"></span> אטרקציות</span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#4ECDC4] inline-block"></span> לינה</span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#F59E0B] inline-block"></span> מסעדות</span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#6C5CE7] inline-block"></span> מותאם אישית</span>
       </div>
 
-      {locations.length > 0 && (
+      {displayLocations.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-bold text-foreground/80 px-1">נקודות שנוספו ידנית</h3>
-          {locations.map((loc) => (
-            <Card key={loc.id} className="border-none shadow-sm rounded-xl bg-white group" data-testid={`location-${loc.id}`}>
+          {displayLocations.map((loc) => (
+            <Card key={loc._id} className="border-none shadow-sm rounded-xl bg-white group" data-testid={`location-${loc._id}`}>
               <CardContent className="p-3 flex items-center gap-3">
                 <span className="text-lg">{loc.icon || "📍"}</span>
                 <div className="flex-1 min-w-0">
@@ -1060,12 +1027,12 @@ function MapView() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-2 rounded-lg bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors"
-                  data-testid={`button-location-nav-${loc.id}`}
+                  data-testid={`button-location-nav-${loc._id}`}
                 >
                   <Navigation className="w-3.5 h-3.5" />
                 </a>
                 {isAdmin && (
-                  <button onClick={() => deleteMutation.mutate(loc.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-location-${loc.id}`}>
+                  <button onClick={() => deleteLocation({ id: loc._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-location-${loc._id}`}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
@@ -1100,11 +1067,18 @@ function MapView() {
             </div>
             <Button
               className="w-full rounded-xl bg-primary h-11"
-              onClick={() => addMutation.mutate({ name: newLoc.name, description: newLoc.description || null, lat: parseFloat(newLoc.lat), lng: parseFloat(newLoc.lng), type: newLoc.type, icon: newLoc.icon || null, dayId: null })}
-              disabled={!newLoc.name || !newLoc.lat || !newLoc.lng || addMutation.isPending}
+              onClick={async () => {
+                if (!newLoc.name || !newLoc.lat || !newLoc.lng) return;
+                setSaving(true);
+                try {
+                  await addLocation({ tripId: tripId as Id<"trips">, name: newLoc.name, description: newLoc.description || undefined, lat: parseFloat(newLoc.lat), lng: parseFloat(newLoc.lng), type: newLoc.type, icon: newLoc.icon || undefined });
+                  setShowAdd(false); setNewLoc({ name: "", description: "", lat: "", lng: "", type: "attraction", icon: "" });
+                } finally { setSaving(false); }
+              }}
+              disabled={!newLoc.name || !newLoc.lat || !newLoc.lng || saving}
               data-testid="button-save-location"
             >
-              {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />} הוסף מיקום
+              {saving ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />} הוסף מיקום
             </Button>
           </div>
         </DialogContent>
@@ -1113,187 +1087,17 @@ function MapView() {
   );
 }
 
-function GDriveFileBrowser({ onSelect }: { onSelect?: (file: any) => void }) {
-  const [folderId, setFolderId] = useState("root");
-  const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([{ id: "root", name: "Drive" }]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-
-  const { data: files = [], isLoading, error } = useQuery<any[]>({
-    queryKey: ["/api/gdrive/files", folderId],
-    queryFn: async () => {
-      const res = await fetch(`/api/gdrive/files?folderId=${folderId}`);
-      if (!res.ok) throw new Error("Failed to load");
-      return res.json();
-    },
-    enabled: !isSearching,
-  });
-
-  const { data: searchResults = [], isLoading: searchLoading } = useQuery<any[]>({
-    queryKey: ["/api/gdrive/search", searchQuery],
-    queryFn: async () => {
-      const res = await fetch(`/api/gdrive/search?q=${encodeURIComponent(searchQuery)}`);
-      if (!res.ok) throw new Error("Search failed");
-      return res.json();
-    },
-    enabled: isSearching && searchQuery.length > 1,
-  });
-
-  const navigateToFolder = (id: string, name: string) => {
-    setFolderId(id);
-    setFolderPath(prev => [...prev, { id, name }]);
-    setIsSearching(false);
-    setSearchQuery("");
-  };
-
-  const navigateBack = (index: number) => {
-    const target = folderPath[index];
-    setFolderId(target.id);
-    setFolderPath(prev => prev.slice(0, index + 1));
-    setIsSearching(false);
-    setSearchQuery("");
-  };
-
-  const getFileIcon = (mimeType: string) => {
-    if (mimeType === "application/vnd.google-apps.folder") return "📁";
-    if (mimeType?.includes("pdf")) return "📕";
-    if (mimeType?.includes("document") || mimeType?.includes("word")) return "📝";
-    if (mimeType?.includes("spreadsheet") || mimeType?.includes("excel")) return "📊";
-    if (mimeType?.includes("presentation") || mimeType?.includes("powerpoint")) return "📽️";
-    if (mimeType?.includes("image")) return "🖼️";
-    return "📄";
-  };
-
-  const displayFiles = isSearching ? searchResults : files;
-  const loading = isSearching ? searchLoading : isLoading;
-
-  return (
-    <div className="space-y-3">
-      <div className="relative">
-        <Input
-          placeholder="חיפוש ב-Google Drive..."
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setIsSearching(e.target.value.length > 0);
-          }}
-          className="h-9 text-sm pr-9"
-          data-testid="input-gdrive-search"
-        />
-        <Filter className="w-4 h-4 absolute right-3 top-2.5 text-muted-foreground" />
-        {searchQuery && (
-          <button onClick={() => { setSearchQuery(""); setIsSearching(false); }} className="absolute left-2 top-2 text-muted-foreground hover:text-foreground">
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-
-      {!isSearching && (
-        <div className="flex gap-1 items-center flex-wrap text-[11px]">
-          {folderPath.map((f, i) => (
-            <div key={f.id} className="flex items-center gap-1">
-              {i > 0 && <span className="text-muted-foreground">/</span>}
-              <button
-                onClick={() => navigateBack(i)}
-                className={`font-medium px-1.5 py-0.5 rounded transition-colors ${i === folderPath.length - 1 ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                {f.name}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {error ? (
-        <div className="text-center py-6 text-muted-foreground">
-          <p className="text-sm">לא ניתן לגשת ל-Google Drive</p>
-        </div>
-      ) : loading ? (
-        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-green-600" /></div>
-      ) : displayFiles.length === 0 ? (
-        <div className="text-center py-6 text-muted-foreground">
-          <p className="text-sm">{isSearching ? "לא נמצאו תוצאות" : "תיקייה ריקה"}</p>
-        </div>
-      ) : (
-        <div className="space-y-1 max-h-[300px] overflow-y-auto">
-          {displayFiles.map((file: any) => {
-            const isFolder = file.mimeType === "application/vnd.google-apps.folder";
-            return (
-              <div
-                key={file.id}
-                className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group"
-                onClick={() => {
-                  if (isFolder) {
-                    navigateToFolder(file.id, file.name);
-                  } else if (file.webViewLink) {
-                    window.open(file.webViewLink, "_blank");
-                  }
-                }}
-                data-testid={`gdrive-file-${file.id}`}
-              >
-                <span className="text-lg flex-shrink-0">{getFileIcon(file.mimeType)}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{file.name}</p>
-                  {file.modifiedTime && (
-                    <p className="text-[10px] text-muted-foreground">
-                      {new Date(file.modifiedTime).toLocaleDateString("he-IL")}
-                    </p>
-                  )}
-                </div>
-                {!isFolder && onSelect && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onSelect(file); }}
-                    className="opacity-0 group-hover:opacity-100 text-primary hover:text-primary/80 p-1.5 bg-primary/10 rounded-lg transition-opacity"
-                    data-testid={`button-link-file-${file.id}`}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                {!isFolder && file.webViewLink && (
-                  <a
-                    href={file.webViewLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="opacity-0 group-hover:opacity-100 text-green-600 hover:text-green-700 p-1.5 bg-green-50 rounded-lg transition-opacity"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DocsView() {
+function DocsView({ tripId }: { tripId: string }) {
   const { isAdmin } = useAdmin();
-  const { data: docs = [], isLoading } = useQuery<TravelDocument[]>({ queryKey: ["/api/travel-documents"] });
+  const docs = useQuery(api.travelDocuments.list, { tripId: tripId as Id<"trips"> });
   const [showAdd, setShowAdd] = useState(false);
-  const [showDriveBrowser, setShowDriveBrowser] = useState(false);
   const [newDoc, setNewDoc] = useState({ name: "", type: "other", url: "", notes: "" });
 
-  const addMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/travel-documents", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/travel-documents"] }); setShowAdd(false); setNewDoc({ name: "", type: "other", url: "", notes: "" }); },
-  });
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/travel-documents/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/travel-documents"] }),
-  });
+  const addDoc = useMutation(api.travelDocuments.create);
+  const deleteDoc = useMutation(api.travelDocuments.remove);
+  const [saving, setSaving] = useState(false);
 
-  const linkDriveFile = (file: any) => {
-    addMutation.mutate({
-      name: file.name,
-      type: "gdrive",
-      url: file.webViewLink || null,
-      notes: null,
-      sortOrder: 0,
-    });
-  };
+  const displayDocs = docs ?? [];
 
   const docTypeInfo: Record<string, { icon: string; label: string; color: string }> = {
     flight: { icon: "✈️", label: "טיסה", color: "bg-blue-50 text-blue-700" },
@@ -1303,11 +1107,10 @@ function DocsView() {
     passport: { icon: "🛂", label: "דרכון", color: "bg-red-50 text-red-700" },
     visa: { icon: "📋", label: "ויזה", color: "bg-amber-50 text-amber-700" },
     ticket: { icon: "🎫", label: "כרטיס", color: "bg-pink-50 text-pink-700" },
-    gdrive: { icon: "📁", label: "Google Drive", color: "bg-green-50 text-green-700" },
     other: { icon: "📄", label: "אחר", color: "bg-gray-50 text-gray-700" },
   };
 
-  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (docs === undefined) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
@@ -1320,50 +1123,19 @@ function DocsView() {
         )}
       </div>
 
-      <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-gradient-to-br from-green-50 to-blue-50">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-2xl">📁</span>
-            <div className="flex-1">
-              <h3 className="font-bold text-sm">Google Drive</h3>
-              <p className="text-xs text-muted-foreground">גישה ישירה לקבצי הנסיעה שלכם ב-Google Drive</p>
-            </div>
-            <div className="flex items-center gap-1.5 bg-green-500/20 px-2 py-1 rounded-full">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-              <span className="text-[10px] font-bold text-green-700">מחובר</span>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full mt-2 rounded-xl text-xs h-9 border-green-200 text-green-700 hover:bg-green-50"
-            onClick={() => setShowDriveBrowser(!showDriveBrowser)}
-            data-testid="button-browse-gdrive"
-          >
-            <FolderOpen className="w-3.5 h-3.5 ml-2" />
-            {showDriveBrowser ? "הסתר דפדפן קבצים" : "עיון בקבצי Google Drive"}
-          </Button>
-          {showDriveBrowser && (
-            <div className="mt-3 pt-3 border-t border-green-200/50">
-              <GDriveFileBrowser onSelect={isAdmin ? linkDriveFile : undefined} />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {docs.length === 0 ? (
+      {displayDocs.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <FileText className="w-12 h-12 mx-auto mb-4 opacity-40" />
           <p className="font-medium">אין מסמכים מקושרים</p>
-          <p className="text-xs mt-1">קשרו קבצים מ-Google Drive או הוסיפו מסמכים ידנית</p>
+          <p className="text-xs mt-1">הוסיפו מסמכים ידנית</p>
         </div>
       ) : (
         <div className="space-y-2">
-          <h3 className="text-sm font-bold text-foreground/80 px-1">מסמכים מקושרים ({docs.length})</h3>
-          {docs.map((doc) => {
+          <h3 className="text-sm font-bold text-foreground/80 px-1">מסמכים מקושרים ({displayDocs.length})</h3>
+          {displayDocs.map((doc) => {
             const info = docTypeInfo[doc.type] || docTypeInfo.other;
             return (
-              <Card key={doc.id} className="border-none shadow-sm rounded-xl bg-white group" data-testid={`doc-${doc.id}`}>
+              <Card key={doc._id} className="border-none shadow-sm rounded-xl bg-white group" data-testid={`doc-${doc._id}`}>
                 <CardContent className="p-3 flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${info.color}`}>
                     {info.icon}
@@ -1376,12 +1148,12 @@ function DocsView() {
                     </div>
                   </div>
                   {doc.url && (
-                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors" data-testid={`button-open-doc-${doc.id}`}>
+                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors" data-testid={`button-open-doc-${doc._id}`}>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   )}
                   {isAdmin && (
-                    <button onClick={() => deleteMutation.mutate(doc.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-doc-${doc.id}`}>
+                    <button onClick={() => deleteDoc({ id: doc._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-doc-${doc._id}`}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -1406,7 +1178,6 @@ function DocsView() {
                 <SelectItem value="insurance">🛡️ ביטוח</SelectItem>
                 <SelectItem value="passport">🛂 דרכון</SelectItem>
                 <SelectItem value="ticket">🎫 כרטיס</SelectItem>
-                <SelectItem value="gdrive">📁 Google Drive</SelectItem>
                 <SelectItem value="other">📄 אחר</SelectItem>
               </SelectContent>
             </Select>
@@ -1414,11 +1185,18 @@ function DocsView() {
             <Textarea placeholder="הערות..." value={newDoc.notes} onChange={(e) => setNewDoc({ ...newDoc, notes: e.target.value })} className="min-h-[60px]" data-testid="input-doc-notes" />
             <Button
               className="w-full rounded-xl bg-primary h-11"
-              onClick={() => addMutation.mutate({ name: newDoc.name, type: newDoc.type, url: newDoc.url || null, notes: newDoc.notes || null, sortOrder: 0 })}
-              disabled={!newDoc.name || addMutation.isPending}
+              onClick={async () => {
+                if (!newDoc.name) return;
+                setSaving(true);
+                try {
+                  await addDoc({ tripId: tripId as Id<"trips">, name: newDoc.name, type: newDoc.type, url: newDoc.url || undefined, notes: newDoc.notes || undefined, sortOrder: 0 });
+                  setShowAdd(false); setNewDoc({ name: "", type: "other", url: "", notes: "" });
+                } finally { setSaving(false); }
+              }}
+              disabled={!newDoc.name || saving}
               data-testid="button-save-doc"
             >
-              {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />} שמור מסמך
+              {saving ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />} שמור מסמך
             </Button>
           </div>
         </DialogContent>
@@ -1427,25 +1205,19 @@ function DocsView() {
   );
 }
 
-function RestaurantsView() {
+function RestaurantsView({ tripId }: { tripId: string }) {
   const { isAdmin } = useAdmin();
-  const { data: restaurants = [], isLoading } = useQuery<Restaurant[]>({ queryKey: ["/api/restaurants"] });
+  const restaurants = useQuery(api.restaurants.list, { tripId: tripId as Id<"trips"> });
   const [showAdd, setShowAdd] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0, lat: "", lng: "" });
 
-  const addMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/restaurants", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/restaurants"] }); setShowAdd(false); resetForm(); },
-  });
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/restaurants/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/restaurants"] }); setEditingId(null); },
-  });
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/restaurants/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/restaurants"] }),
-  });
+  const addRestaurant = useMutation(api.restaurants.create);
+  const updateRestaurant = useMutation(api.restaurants.update);
+  const deleteRestaurant = useMutation(api.restaurants.remove);
+  const [saving, setSaving] = useState(false);
+
+  const displayRestaurants = restaurants ?? [];
 
   const resetForm = () => setForm({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0, lat: "", lng: "" });
 
@@ -1461,9 +1233,40 @@ function RestaurantsView() {
     { value: "other", label: "אחר", icon: "🍴" },
   ];
 
-  const getCuisineInfo = (cuisine: string | null) => cuisineOptions.find(c => c.value === cuisine) || { value: "other", label: "מסעדה", icon: "🍴" };
+  const getCuisineInfo = (cuisine: string | null | undefined) => cuisineOptions.find(c => c.value === cuisine) || { value: "other", label: "מסעדה", icon: "🍴" };
 
-  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (restaurants === undefined) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+
+  const handleSave = async () => {
+    if (!form.name) return;
+    setSaving(true);
+    try {
+      const payload = {
+        tripId: tripId as Id<"trips">,
+        name: form.name,
+        cuisine: form.cuisine || undefined,
+        priceRange: form.priceRange || undefined,
+        address: form.address || undefined,
+        mapsUrl: form.mapsUrl || undefined,
+        wazeUrl: form.wazeUrl || undefined,
+        notes: form.notes || undefined,
+        isKosher: form.isKosher,
+        rating: form.rating || undefined,
+        lat: form.lat ? parseFloat(form.lat) : undefined,
+        lng: form.lng ? parseFloat(form.lng) : undefined,
+      };
+      if (editingId) {
+        await updateRestaurant({ id: editingId as Id<"restaurants">, ...payload });
+        setEditingId(null);
+      } else {
+        await addRestaurant(payload);
+        setShowAdd(false);
+      }
+      resetForm();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
@@ -1488,7 +1291,7 @@ function RestaurantsView() {
         </CardContent>
       </Card>
 
-      {restaurants.length === 0 ? (
+      {displayRestaurants.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <UtensilsCrossed className="w-12 h-12 mx-auto mb-4 opacity-40" />
           <p className="font-medium">אין מסעדות ברשימה</p>
@@ -1496,10 +1299,10 @@ function RestaurantsView() {
         </div>
       ) : (
         <div className="space-y-2">
-          {restaurants.map((r) => {
+          {displayRestaurants.map((r) => {
             const ci = getCuisineInfo(r.cuisine);
             return (
-              <Card key={r.id} className={`border-none shadow-sm rounded-xl group transition-all ${r.isVisited ? "bg-green-50/50" : "bg-white"}`} data-testid={`restaurant-${r.id}`}>
+              <Card key={r._id} className={`border-none shadow-sm rounded-xl group transition-all ${r.isVisited ? "bg-green-50/50" : "bg-white"}`} data-testid={`restaurant-${r._id}`}>
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-lg flex-shrink-0">
@@ -1528,7 +1331,7 @@ function RestaurantsView() {
                             href={r.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.address || r.name)}`}
                             target="_blank" rel="noopener noreferrer"
                             className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-1"
-                            data-testid={`link-maps-${r.id}`}
+                            data-testid={`link-maps-${r._id}`}
                           >
                             <Navigation className="w-3 h-3" /> נווט ב-Google Maps
                           </a>
@@ -1536,7 +1339,7 @@ function RestaurantsView() {
                             href={r.wazeUrl || `https://waze.com/ul?q=${encodeURIComponent(r.address || r.name)}&navigate=yes`}
                             target="_blank" rel="noopener noreferrer"
                             className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-cyan-50 text-cyan-600 hover:bg-cyan-100 transition-colors flex items-center gap-1"
-                            data-testid={`link-waze-${r.id}`}
+                            data-testid={`link-waze-${r._id}`}
                           >
                             <Navigation className="w-3 h-3" /> נווט ב-Waze
                           </a>
@@ -1548,9 +1351,9 @@ function RestaurantsView() {
                     {isAdmin && (
                       <>
                         <button
-                          onClick={() => updateMutation.mutate({ id: r.id, data: { isVisited: !r.isVisited } })}
+                          onClick={() => updateRestaurant({ id: r._id, isVisited: !r.isVisited })}
                           className={`p-1.5 rounded-lg transition-colors ${r.isVisited ? "bg-green-100 text-green-600" : "bg-gray-50 text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
-                          data-testid={`button-toggle-visited-${r.id}`}
+                          data-testid={`button-toggle-visited-${r._id}`}
                         >
                           <Check className="w-3.5 h-3.5" />
                         </button>
@@ -1569,14 +1372,14 @@ function RestaurantsView() {
                               lat: r.lat ? String(r.lat) : "",
                               lng: r.lng ? String(r.lng) : "",
                             });
-                            setEditingId(r.id);
+                            setEditingId(r._id);
                           }}
                           className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary p-1.5 transition-all"
-                          data-testid={`button-edit-restaurant-${r.id}`}
+                          data-testid={`button-edit-restaurant-${r._id}`}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => deleteMutation.mutate(r.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1.5 transition-all" data-testid={`button-delete-restaurant-${r.id}`}>
+                        <button onClick={() => deleteRestaurant({ id: r._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1.5 transition-all" data-testid={`button-delete-restaurant-${r._id}`}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </>
@@ -1634,18 +1437,11 @@ function RestaurantsView() {
             <div className="flex gap-2 pt-1">
               <Button
                 className="flex-1 h-10 text-sm rounded-xl bg-primary"
-                onClick={() => {
-                  const payload = { ...form, rating: form.rating || null, priceRange: form.priceRange || null, address: form.address || null, mapsUrl: form.mapsUrl || null, wazeUrl: form.wazeUrl || null, notes: form.notes || null, cuisine: form.cuisine || null, lat: form.lat ? parseFloat(form.lat) : null, lng: form.lng ? parseFloat(form.lng) : null };
-                  if (editingId) {
-                    updateMutation.mutate({ id: editingId, data: payload });
-                  } else {
-                    addMutation.mutate(payload);
-                  }
-                }}
-                disabled={!form.name || addMutation.isPending || updateMutation.isPending}
+                onClick={handleSave}
+                disabled={!form.name || saving}
                 data-testid="button-save-restaurant"
               >
-                {(addMutation.isPending || updateMutation.isPending) ? <Loader2 className="w-4 h-4 animate-spin" /> : editingId ? "עדכן" : "הוסף"}
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editingId ? "עדכן" : "הוסף"}
               </Button>
               <Button variant="outline" className="h-10 text-sm rounded-xl" onClick={() => { setShowAdd(false); setEditingId(null); resetForm(); }}>ביטול</Button>
             </div>
@@ -1656,31 +1452,31 @@ function RestaurantsView() {
   );
 }
 
-function TipsView() {
+function TipsView({ tripId }: { tripId: string }) {
   const { isAdmin } = useAdmin();
-  const { data: tipsList = [], isLoading } = useQuery<Tip[]>({ queryKey: ["/api/tips"] });
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/tips/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tips"] }),
-  });
-  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+  const tipsList = useQuery(api.tips.list, { tripId: tripId as Id<"trips"> });
+  const deleteTip = useMutation(api.tips.remove);
+  const displayTips = tipsList ?? [];
+
+  if (tipsList === undefined) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
       <h2 className="text-lg font-bold text-foreground tracking-tight px-1">📌 טיפים חשובים</h2>
       <div className="space-y-3">
-        {tipsList.map((tip) => (
-          <Card key={tip.id} className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white group" data-testid={`tip-${tip.id}`}>
+        {displayTips.map((tip) => (
+          <Card key={tip._id} className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white group" data-testid={`tip-${tip._id}`}>
             <CardContent className="p-4 flex items-start gap-3">
               <span className="text-xl flex-shrink-0 mt-0.5">{tip.icon}</span>
               <p className="text-sm text-foreground/90 leading-relaxed flex-1">{tip.text}</p>
-              {isAdmin && <button onClick={() => deleteMutation.mutate(tip.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity flex-shrink-0" data-testid={`button-delete-tip-${tip.id}`}>
+              {isAdmin && <button onClick={() => deleteTip({ id: tip._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity flex-shrink-0" data-testid={`button-delete-tip-${tip._id}`}>
                 <Trash2 className="w-3.5 h-3.5" />
               </button>}
             </CardContent>
           </Card>
         ))}
       </div>
-      {isAdmin && <AddTipForm />}
+      {isAdmin && <AddTipForm tripId={tripId} />}
       <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-gradient-to-br from-primary/5 to-secondary/5">
         <CardContent className="p-5">
           <h3 className="font-bold text-sm mb-3">💰 הערכת תקציב</h3>
@@ -1697,14 +1493,24 @@ function TipsView() {
   );
 }
 
-function AddTipForm() {
+function AddTipForm({ tripId }: { tripId: string }) {
   const [open, setOpen] = useState(false);
   const [icon, setIcon] = useState("💡");
   const [text, setText] = useState("");
-  const mutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/tips", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/tips"] }); setOpen(false); setIcon("💡"); setText(""); },
-  });
+  const addTip = useMutation(api.tips.create);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!text) return;
+    setSaving(true);
+    try {
+      await addTip({ tripId: tripId as Id<"trips">, icon, text, sortOrder: 99 });
+      setOpen(false); setIcon("💡"); setText("");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!open) return (
     <button onClick={() => setOpen(true)} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 py-1 px-1" data-testid="button-add-tip">
       <Plus className="w-3 h-3" /> הוסף טיפ
@@ -1718,8 +1524,8 @@ function AddTipForm() {
           <Input placeholder="טקסט הטיפ..." value={text} onChange={(e) => setText(e.target.value)} className="flex-1 h-9 text-sm" data-testid="input-tip-text" />
         </div>
         <div className="flex gap-2">
-          <Button size="sm" className="h-8 text-xs rounded-lg bg-primary" onClick={() => mutation.mutate({ icon, text, sortOrder: 99 })} disabled={!text || mutation.isPending} data-testid="button-save-tip">
-            {mutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "שמור"}
+          <Button size="sm" className="h-8 text-xs rounded-lg bg-primary" onClick={handleSave} disabled={!text || saving} data-testid="button-save-tip">
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : "שמור"}
           </Button>
           <Button size="sm" variant="ghost" className="h-8 text-xs rounded-lg" onClick={() => setOpen(false)}>ביטול</Button>
         </div>

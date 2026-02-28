@@ -1,35 +1,29 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthActions } from "@convex-dev/auth/react";
 
-export default function AuthPage({ onAuth }: { onAuth: () => void }) {
+export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { signIn } = useAuthActions();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
-      const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
-      const body: any = { username, password };
-      if (mode === "register") body.displayName = displayName;
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "שגיאה", description: data.message, variant: "destructive" });
-        return;
+      if (mode === "login") {
+        await signIn("password", { email: username, password, flow: "signIn" });
+      } else {
+        await signIn("password", { email: username, password, flow: "signUp", name: displayName });
       }
       toast({ title: mode === "login" ? "התחברת בהצלחה!" : "נרשמת בהצלחה!" });
-      onAuth();
-    } catch {
-      toast({ title: "שגיאה", description: "שגיאת שרת", variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "שגיאת שרת";
+      toast({ title: "שגיאה", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }

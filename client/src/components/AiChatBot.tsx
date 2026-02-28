@@ -28,7 +28,8 @@ export default function AiChatBot() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/chat", {
+      const convexHttpUrl = import.meta.env.VITE_CONVEX_URL?.replace('.convex.cloud', '.convex.site') ?? '';
+      const res = await fetch(`${convexHttpUrl}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newMessages }),
