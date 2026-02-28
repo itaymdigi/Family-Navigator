@@ -748,7 +748,7 @@ function HotelsView({ tripId }: { tripId: string }) {
                   </div>
                   <div className="flex items-center gap-1">
                     {hotel.priceRange && <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg">{hotel.priceRange}</span>}
-                    {isAdmin && <button onClick={() => deleteAccommodation({ id: hotel._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-hotel-${hotel._id}`}>
+                    {isAdmin && <button onClick={() => deleteAccommodation({ id: hotel._id })} className="opacity-60 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-hotel-${hotel._id}`}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>}
                   </div>
@@ -1121,7 +1121,7 @@ function PhotosView({ tripId }: { tripId: string }) {
                     {member.avatar || member.name[0]}
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-60 transition-opacity duration-300 flex items-end justify-between p-3">
                   <span className="text-white text-xs font-semibold">{photo.caption}</span>
                   {isAdmin && <button onClick={(e) => { e.stopPropagation(); deletePhoto({ id: photo._id }); }} className="text-white/80 hover:text-red-400 p-1" data-testid={`button-delete-photo-${photo._id}`}><Trash2 className="w-4 h-4" /></button>}
                 </div>
@@ -1332,7 +1332,7 @@ function MapView({ tripId }: { tripId: string }) {
                   <Navigation className="w-3.5 h-3.5" />
                 </a>
                 {isAdmin && (
-                  <button onClick={() => deleteLocation({ id: loc._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-location-${loc._id}`}>
+                  <button onClick={() => deleteLocation({ id: loc._id })} className="opacity-60 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-location-${loc._id}`}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
@@ -1489,7 +1489,7 @@ function DocsView({ tripId }: { tripId: string }) {
                     </a>
                   )}
                   {isAdmin && (
-                    <button onClick={() => deleteDoc({ id: doc._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-doc-${doc._id}`}>
+                    <button onClick={() => deleteDoc({ id: doc._id })} className="opacity-60 text-red-400 hover:text-red-600 p-1 transition-opacity" data-testid={`button-delete-doc-${doc._id}`}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -1767,12 +1767,12 @@ function RestaurantsView({ tripId }: { tripId: string }) {
                             });
                             setEditingId(r._id);
                           }}
-                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary p-1.5 transition-all"
+                          className="opacity-60 text-muted-foreground hover:text-primary p-1.5 transition-all"
                           data-testid={`button-edit-restaurant-${r._id}`}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => deleteRestaurant({ id: r._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1.5 transition-all" data-testid={`button-delete-restaurant-${r._id}`}>
+                        <button onClick={() => deleteRestaurant({ id: r._id })} className="opacity-60 text-red-400 hover:text-red-600 p-1.5 transition-all" data-testid={`button-delete-restaurant-${r._id}`}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </>
@@ -1883,7 +1883,7 @@ function TipsView({ tripId }: { tripId: string }) {
             <CardContent className="p-4 flex items-start gap-3">
               <span className="text-xl flex-shrink-0 mt-0.5">{tip.icon}</span>
               <p className="text-sm text-foreground/90 leading-relaxed flex-1">{tip.text}</p>
-              {isAdmin && <button onClick={() => deleteTip({ id: tip._id })} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 transition-opacity flex-shrink-0" data-testid={`button-delete-tip-${tip._id}`}>
+              {isAdmin && <button onClick={() => deleteTip({ id: tip._id })} className="opacity-60 text-red-400 hover:text-red-600 p-1 transition-opacity flex-shrink-0" data-testid={`button-delete-tip-${tip._id}`}>
                 <Trash2 className="w-3.5 h-3.5" />
               </button>}
             </CardContent>
