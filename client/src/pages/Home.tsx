@@ -1423,27 +1423,29 @@ function RestaurantsView() {
                       </div>
                       {r.address && <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1"><MapPin className="w-3 h-3 flex-shrink-0" />{r.address}</p>}
                       {r.notes && <p className="text-[11px] text-muted-foreground mt-1">{r.notes}</p>}
+                      {(r.mapsUrl || r.wazeUrl || r.address) && (
+                        <div className="flex items-center gap-1.5 mt-2">
+                          <a
+                            href={r.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.address || r.name)}`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-1"
+                            data-testid={`link-maps-${r.id}`}
+                          >
+                            <Navigation className="w-3 h-3" /> נווט ב-Google Maps
+                          </a>
+                          <a
+                            href={r.wazeUrl || `https://waze.com/ul?q=${encodeURIComponent(r.address || r.name)}&navigate=yes`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-cyan-50 text-cyan-600 hover:bg-cyan-100 transition-colors flex items-center gap-1"
+                            data-testid={`link-waze-${r.id}`}
+                          >
+                            <Navigation className="w-3 h-3" /> נווט ב-Waze
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 mt-2 justify-end">
-                    {(() => {
-                      const mapsLink = r.mapsUrl || (r.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.address)}` : null);
-                      const wazeLink = r.wazeUrl || (r.address ? `https://waze.com/ul?q=${encodeURIComponent(r.address)}&navigate=yes` : null);
-                      return (
-                        <>
-                          {mapsLink && (
-                            <a href={mapsLink} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-1" data-testid={`link-maps-${r.id}`}>
-                              <Navigation className="w-3 h-3" /> Google Maps
-                            </a>
-                          )}
-                          {wazeLink && (
-                            <a href={wazeLink} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-600 hover:bg-cyan-100 transition-colors flex items-center gap-1" data-testid={`link-waze-${r.id}`}>
-                              <Navigation className="w-3 h-3" /> Waze
-                            </a>
-                          )}
-                        </>
-                      );
-                    })()}
                     {isAdmin && (
                       <>
                         <button
