@@ -13,6 +13,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
+import { getUncachableGoogleDriveClient } from "./googleDrive";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -272,6 +273,42 @@ export async function registerRoutes(
       allAttractions.push(...attrs.map(a => ({ ...a, dayNumber: day.dayNumber, dayTitle: day.title })));
     }
     res.json(allAttractions);
+  });
+
+  // Google Drive Integration
+  app.get("/api/gdrive/files", async (req, res) => {
+    try {
+      const drive = await getUncachableGoogleDriveClient();
+      const folderId = req.query.folderId as string || "root";
+      const response = await drive.files.list({
+        q: `'${folderId}' in parents and trashed = false`,
+        fields: "files(id, name, mimeType, webViewLink, iconLink, thumbnailLink, modifiedTime, size)",
+        orderBy: "folder,name",
+        pageSize: 50,
+      });
+      res.json(response.data.files || []);
+    } catch (error: any) {
+      console.error("Google Drive error:", error.message);
+      res.status(500).json({ message: error.message || "Failed to list files" });
+    }
+  });
+
+  app.get("/api/gdrive/search", async (req, res) => {
+    try {
+      const drive = await getUncachableGoogleDriveClient();
+      const query = req.query.q as string;
+      if (!query) return res.status(400).json({ message: "Query required" });
+      const response = await drive.files.list({
+        q: `name contains '${query.replace(/'/g, "\\'")}' and trashed = false`,
+        fields: "files(id, name, mimeType, webViewLink, iconLink, thumbnailLink, modifiedTime, size)",
+        orderBy: "modifiedTime desc",
+        pageSize: 20,
+      });
+      res.json(response.data.files || []);
+    } catch (error: any) {
+      console.error("Google Drive search error:", error.message);
+      res.status(500).json({ message: error.message || "Search failed" });
+    }
   });
 
   const CHAT_MODELS = [

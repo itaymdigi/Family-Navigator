@@ -951,10 +951,167 @@ function MapView() {
   );
 }
 
+function GDriveFileBrowser({ onSelect }: { onSelect?: (file: any) => void }) {
+  const [folderId, setFolderId] = useState("root");
+  const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([{ id: "root", name: "Drive" }]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+
+  const { data: files = [], isLoading, error } = useQuery<any[]>({
+    queryKey: ["/api/gdrive/files", folderId],
+    queryFn: async () => {
+      const res = await fetch(`/api/gdrive/files?folderId=${folderId}`);
+      if (!res.ok) throw new Error("Failed to load");
+      return res.json();
+    },
+    enabled: !isSearching,
+  });
+
+  const { data: searchResults = [], isLoading: searchLoading } = useQuery<any[]>({
+    queryKey: ["/api/gdrive/search", searchQuery],
+    queryFn: async () => {
+      const res = await fetch(`/api/gdrive/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!res.ok) throw new Error("Search failed");
+      return res.json();
+    },
+    enabled: isSearching && searchQuery.length > 1,
+  });
+
+  const navigateToFolder = (id: string, name: string) => {
+    setFolderId(id);
+    setFolderPath(prev => [...prev, { id, name }]);
+    setIsSearching(false);
+    setSearchQuery("");
+  };
+
+  const navigateBack = (index: number) => {
+    const target = folderPath[index];
+    setFolderId(target.id);
+    setFolderPath(prev => prev.slice(0, index + 1));
+    setIsSearching(false);
+    setSearchQuery("");
+  };
+
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType === "application/vnd.google-apps.folder") return "📁";
+    if (mimeType?.includes("pdf")) return "📕";
+    if (mimeType?.includes("document") || mimeType?.includes("word")) return "📝";
+    if (mimeType?.includes("spreadsheet") || mimeType?.includes("excel")) return "📊";
+    if (mimeType?.includes("presentation") || mimeType?.includes("powerpoint")) return "📽️";
+    if (mimeType?.includes("image")) return "🖼️";
+    return "📄";
+  };
+
+  const displayFiles = isSearching ? searchResults : files;
+  const loading = isSearching ? searchLoading : isLoading;
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Input
+          placeholder="חיפוש ב-Google Drive..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setIsSearching(e.target.value.length > 0);
+          }}
+          className="h-9 text-sm pr-9"
+          data-testid="input-gdrive-search"
+        />
+        <Filter className="w-4 h-4 absolute right-3 top-2.5 text-muted-foreground" />
+        {searchQuery && (
+          <button onClick={() => { setSearchQuery(""); setIsSearching(false); }} className="absolute left-2 top-2 text-muted-foreground hover:text-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {!isSearching && (
+        <div className="flex gap-1 items-center flex-wrap text-[11px]">
+          {folderPath.map((f, i) => (
+            <div key={f.id} className="flex items-center gap-1">
+              {i > 0 && <span className="text-muted-foreground">/</span>}
+              <button
+                onClick={() => navigateBack(i)}
+                className={`font-medium px-1.5 py-0.5 rounded transition-colors ${i === folderPath.length - 1 ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {f.name}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error ? (
+        <div className="text-center py-6 text-muted-foreground">
+          <p className="text-sm">לא ניתן לגשת ל-Google Drive</p>
+        </div>
+      ) : loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-green-600" /></div>
+      ) : displayFiles.length === 0 ? (
+        <div className="text-center py-6 text-muted-foreground">
+          <p className="text-sm">{isSearching ? "לא נמצאו תוצאות" : "תיקייה ריקה"}</p>
+        </div>
+      ) : (
+        <div className="space-y-1 max-h-[300px] overflow-y-auto">
+          {displayFiles.map((file: any) => {
+            const isFolder = file.mimeType === "application/vnd.google-apps.folder";
+            return (
+              <div
+                key={file.id}
+                className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group"
+                onClick={() => {
+                  if (isFolder) {
+                    navigateToFolder(file.id, file.name);
+                  } else if (file.webViewLink) {
+                    window.open(file.webViewLink, "_blank");
+                  }
+                }}
+                data-testid={`gdrive-file-${file.id}`}
+              >
+                <span className="text-lg flex-shrink-0">{getFileIcon(file.mimeType)}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{file.name}</p>
+                  {file.modifiedTime && (
+                    <p className="text-[10px] text-muted-foreground">
+                      {new Date(file.modifiedTime).toLocaleDateString("he-IL")}
+                    </p>
+                  )}
+                </div>
+                {!isFolder && onSelect && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onSelect(file); }}
+                    className="opacity-0 group-hover:opacity-100 text-primary hover:text-primary/80 p-1.5 bg-primary/10 rounded-lg transition-opacity"
+                    data-testid={`button-link-file-${file.id}`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {!isFolder && file.webViewLink && (
+                  <a
+                    href={file.webViewLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="opacity-0 group-hover:opacity-100 text-green-600 hover:text-green-700 p-1.5 bg-green-50 rounded-lg transition-opacity"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DocsView() {
   const { isAdmin } = useAdmin();
   const { data: docs = [], isLoading } = useQuery<TravelDocument[]>({ queryKey: ["/api/travel-documents"] });
   const [showAdd, setShowAdd] = useState(false);
+  const [showDriveBrowser, setShowDriveBrowser] = useState(false);
   const [newDoc, setNewDoc] = useState({ name: "", type: "other", url: "", notes: "" });
 
   const addMutation = useMutation({
@@ -965,6 +1122,16 @@ function DocsView() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/travel-documents/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/travel-documents"] }),
   });
+
+  const linkDriveFile = (file: any) => {
+    addMutation.mutate({
+      name: file.name,
+      type: "gdrive",
+      url: file.webViewLink || null,
+      notes: null,
+      sortOrder: 0,
+    });
+  };
 
   const docTypeInfo: Record<string, { icon: string; label: string; color: string }> = {
     flight: { icon: "✈️", label: "טיסה", color: "bg-blue-50 text-blue-700" },
@@ -995,21 +1162,29 @@ function DocsView() {
         <CardContent className="p-4">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl">📁</span>
-            <div>
+            <div className="flex-1">
               <h3 className="font-bold text-sm">Google Drive</h3>
-              <p className="text-xs text-muted-foreground">הוסיפו קישורים לתיקיית Google Drive עם מסמכי הנסיעה</p>
+              <p className="text-xs text-muted-foreground">גישה ישירה לקבצי הנסיעה שלכם ב-Google Drive</p>
+            </div>
+            <div className="flex items-center gap-1.5 bg-green-500/20 px-2 py-1 rounded-full">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+              <span className="text-[10px] font-bold text-green-700">מחובר</span>
             </div>
           </div>
-          {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full mt-2 rounded-xl text-xs h-9"
-              onClick={() => { setNewDoc({ ...newDoc, type: "gdrive" }); setShowAdd(true); }}
-              data-testid="button-add-gdrive"
-            >
-              <FolderOpen className="w-3.5 h-3.5 ml-2" /> הוסף קישור ל-Google Drive
-            </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full mt-2 rounded-xl text-xs h-9 border-green-200 text-green-700 hover:bg-green-50"
+            onClick={() => setShowDriveBrowser(!showDriveBrowser)}
+            data-testid="button-browse-gdrive"
+          >
+            <FolderOpen className="w-3.5 h-3.5 ml-2" />
+            {showDriveBrowser ? "הסתר דפדפן קבצים" : "עיון בקבצי Google Drive"}
+          </Button>
+          {showDriveBrowser && (
+            <div className="mt-3 pt-3 border-t border-green-200/50">
+              <GDriveFileBrowser onSelect={isAdmin ? linkDriveFile : undefined} />
+            </div>
           )}
         </CardContent>
       </Card>
@@ -1017,11 +1192,12 @@ function DocsView() {
       {docs.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <FileText className="w-12 h-12 mx-auto mb-4 opacity-40" />
-          <p className="font-medium">אין מסמכים עדיין</p>
-          <p className="text-xs mt-1">הוסיפו כרטיסי טיסה, הזמנות מלון, ביטוח ועוד</p>
+          <p className="font-medium">אין מסמכים מקושרים</p>
+          <p className="text-xs mt-1">קשרו קבצים מ-Google Drive או הוסיפו מסמכים ידנית</p>
         </div>
       ) : (
         <div className="space-y-2">
+          <h3 className="text-sm font-bold text-foreground/80 px-1">מסמכים מקושרים ({docs.length})</h3>
           {docs.map((doc) => {
             const info = docTypeInfo[doc.type] || docTypeInfo.other;
             return (

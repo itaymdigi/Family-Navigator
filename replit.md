@@ -12,6 +12,7 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - **PWA**: Service worker for offline caching (API responses, photos, static assets)
 - **File Upload**: Multer for direct photo uploads from device
 - **Map**: Leaflet.js with OpenStreetMap tiles
+- **Google Drive**: Live file browser via Replit connector (googleapis)
 - **Direction**: RTL (Hebrew)
 
 ## Access Control
@@ -56,6 +57,8 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - `GET/POST/PATCH/DELETE /api/travel-documents` — travel docs
 - `GET /api/all-attractions` — all attractions with day info (for map)
 - `POST /api/chat` — AI chatbot (streaming SSE)
+- `GET /api/gdrive/files?folderId=` — Google Drive file listing
+- `GET /api/gdrive/search?q=` — Google Drive file search
 
 ## Key Files
 - `shared/schema.ts` — Drizzle schema + Zod validation
@@ -68,4 +71,5 @@ A mobile-responsive Hebrew RTL PWA for a family trip to Northern Czech Republic 
 - `client/public/sw.js` — Service worker (offline caching)
 - `client/public/manifest.json` — PWA manifest
 - `client/src/index.css` — Design system tokens + Tailwind config
+- `server/googleDrive.ts` — Google Drive API client (uses Replit connector, never cache client)
 - `uploads/` — Directory for uploaded photo files
