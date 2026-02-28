@@ -447,10 +447,20 @@ function ItineraryView() {
 function HotelsView() {
   const { isAdmin } = useAdmin();
   const { data: hotels = [], isLoading } = useQuery<Accommodation[]>({ queryKey: ["/api/accommodations"] });
+  const [showDocDialog, setShowDocDialog] = useState<number | null>(null);
+  const [docUrl, setDocUrl] = useState("");
+  const [docName, setDocName] = useState("");
+  const [showDrivePicker, setShowDrivePicker] = useState(false);
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/accommodations/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/accommodations"] }),
   });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/accommodations/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/accommodations"] }); setShowDocDialog(null); setDocUrl(""); setDocName(""); setShowDrivePicker(false); },
+  });
+
   if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   const grouped = hotels.reduce((acc, h) => { const b = h.baseName || "אחר"; if (!acc[b]) acc[b] = []; acc[b].push(h); return acc; }, {} as Record<string, Accommodation[]>);
   return (
@@ -479,15 +489,109 @@ function HotelsView() {
                 </div>
                 <p className="text-xs text-muted-foreground">{hotel.description}</p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="w-3.5 h-3.5" /><span>{hotel.dates}</span></div>
+
+                {hotel.reservationUrl && (
+                  <a
+                    href={hotel.reservationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 p-2.5 rounded-xl bg-green-50 hover:bg-green-100 transition-colors"
+                    data-testid={`link-reservation-${hotel.id}`}
+                  >
+                    <FileCheck className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-bold text-green-700 truncate">{hotel.reservationName || "מסמך הזמנה"}</p>
+                      <p className="text-[9px] text-green-600/70">לחצו לפתיחת מסמך ההזמנה</p>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                  </a>
+                )}
+
                 <div className="flex gap-2">
                   {hotel.mapsUrl && <a href={hotel.mapsUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-hotel-maps-${hotel.id}`}><Button size="sm" className="w-full rounded-lg bg-secondary hover:bg-secondary/90 text-white text-xs h-8 gap-1.5"><Navigation className="w-3 h-3" /> Maps</Button></a>}
                   {hotel.wazeUrl && <a href={hotel.wazeUrl} target="_blank" rel="noopener noreferrer" className="flex-1" data-testid={`button-hotel-waze-${hotel.id}`}><Button size="sm" variant="outline" className="w-full rounded-lg text-xs h-8 gap-1.5"><ExternalLink className="w-3 h-3" /> Waze</Button></a>}
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-lg text-xs h-8 gap-1.5 border-green-200 text-green-700 hover:bg-green-50"
+                      onClick={() => {
+                        setShowDocDialog(hotel.id);
+                        setDocUrl(hotel.reservationUrl || "");
+                        setDocName(hotel.reservationName || "");
+                        setShowDrivePicker(false);
+                      }}
+                      data-testid={`button-add-reservation-${hotel.id}`}
+                    >
+                      <FileCheck className="w-3 h-3" />
+                      {hotel.reservationUrl ? "עדכן הזמנה" : "צרף הזמנה"}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       ))}
+
+      <Dialog open={showDocDialog !== null} onOpenChange={(open) => { if (!open) { setShowDocDialog(null); setDocUrl(""); setDocName(""); setShowDrivePicker(false); } }}>
+        <DialogContent className="max-w-[90vw] rounded-2xl max-h-[85vh] overflow-y-auto" dir="rtl">
+          <DialogHeader><DialogTitle>צירוף מסמך הזמנה</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Input placeholder="שם המסמך (למשל: אישור הזמנה Booking)" value={docName} onChange={(e) => setDocName(e.target.value)} data-testid="input-reservation-name" />
+            <Input placeholder="קישור למסמך (URL)" value={docUrl} onChange={(e) => setDocUrl(e.target.value)} data-testid="input-reservation-url" />
+            <div className="text-center text-[11px] text-muted-foreground">— או —</div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full rounded-xl text-xs h-9 border-green-200 text-green-700 hover:bg-green-50"
+              onClick={() => setShowDrivePicker(!showDrivePicker)}
+              data-testid="button-pick-from-drive"
+            >
+              <FolderOpen className="w-3.5 h-3.5 ml-2" />
+              {showDrivePicker ? "הסתר Google Drive" : "בחר מ-Google Drive"}
+            </Button>
+            {showDrivePicker && (
+              <div className="border border-green-200 rounded-xl p-3">
+                <GDriveFileBrowser onSelect={(file: any) => {
+                  setDocUrl(file.webViewLink || "");
+                  setDocName(file.name || "");
+                  setShowDrivePicker(false);
+                }} />
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <Button
+                className="flex-1 h-10 text-sm rounded-xl bg-primary"
+                onClick={() => {
+                  if (showDocDialog && docUrl) {
+                    updateMutation.mutate({ id: showDocDialog, data: { reservationUrl: docUrl, reservationName: docName || "מסמך הזמנה" } });
+                  }
+                }}
+                disabled={!docUrl || updateMutation.isPending}
+                data-testid="button-save-reservation"
+              >
+                {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "שמור"}
+              </Button>
+              {showDocDialog && hotels.find(h => h.id === showDocDialog)?.reservationUrl && (
+                <Button
+                  variant="outline"
+                  className="h-10 text-sm rounded-xl text-red-500 border-red-200 hover:bg-red-50"
+                  onClick={() => {
+                    if (showDocDialog) {
+                      updateMutation.mutate({ id: showDocDialog, data: { reservationUrl: null, reservationName: null } });
+                    }
+                  }}
+                  data-testid="button-remove-reservation"
+                >
+                  <Trash2 className="w-3.5 h-3.5 ml-1" /> הסר
+                </Button>
+              )}
+              <Button variant="outline" className="h-10 text-sm rounded-xl" onClick={() => { setShowDocDialog(null); setDocUrl(""); setDocName(""); setShowDrivePicker(false); }}>ביטול</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

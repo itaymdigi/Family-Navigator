@@ -66,6 +66,8 @@ export const accommodations = pgTable("accommodations", {
   dates: text("dates").notNull(),
   baseName: text("base_name"),
   isSelected: boolean("is_selected").default(false),
+  reservationUrl: text("reservation_url"),
+  reservationName: text("reservation_name"),
 });
 
 export const insertAccommodationSchema = createInsertSchema(accommodations).omit({ id: true });
