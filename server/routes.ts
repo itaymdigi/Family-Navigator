@@ -469,13 +469,23 @@ export async function registerRoutes(
         restaurants: restaurants,
       };
 
+      function snakeToCamel(obj: Record<string, any>): Record<string, any> {
+        const result: Record<string, any> = {};
+        for (const [key, value] of Object.entries(obj)) {
+          const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+          result[camelKey] = value;
+        }
+        return result;
+      }
+
       for (const tableName of tableOrder) {
         const table = tableMap[tableName];
         const rows = seedData[tableName];
         if (!rows || rows.length === 0) continue;
 
         for (const row of rows) {
-          const { id, ...data } = row;
+          const camelRow = snakeToCamel(row);
+          const { id, createdAt, ...data } = camelRow;
           await db.insert(table).values(data);
         }
         console.log(`[seed] ${tableName}: ${rows.length} rows`);
