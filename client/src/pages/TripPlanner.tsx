@@ -21,8 +21,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 
-const AdminContext = createContext<{ isAdmin: boolean; toggleAdmin: () => void }>({ isAdmin: false, toggleAdmin: () => {} });
+const AdminContext = createContext<{ isAdmin: boolean; toggleAdmin: () => void; isOnline: boolean }>({ isAdmin: false, toggleAdmin: () => {}, isOnline: true });
 function useAdmin() { return useContext(AdminContext); }
+
+function useWithCache<T>(liveData: T | undefined, cacheKey: string): T | undefined {
+  useEffect(() => {
+    if (liveData !== undefined) {
+      try { localStorage.setItem(cacheKey, JSON.stringify(liveData)); } catch {}
+    }
+  }, [liveData, cacheKey]);
+  if (liveData !== undefined) return liveData;
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    return cached ? (JSON.parse(cached) as T) : undefined;
+  } catch { return undefined; }
+}
 
 function useOnlineStatus() {
   const [online, setOnline] = useState(navigator.onLine);
@@ -72,7 +85,8 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
   const [activeTab, setActiveTab] = useState("itinerary");
   const [isAdmin, setIsAdmin] = useState(false);
   const isOnline = useOnlineStatus();
-  const trip = useQuery(api.trips.get, { id: tripId as Id<"trips"> });
+  const tripLive = useQuery(api.trips.get, { id: tripId as Id<"trips"> });
+  const trip = useWithCache(tripLive, `fnav-trip-${tripId}`);
   const countdown = useCountdown(trip?.startDate ?? "2099-01-01T00:00:00", trip?.endDate);
   const currentUser = useQuery(api.users.me);
   const { signOut } = useAuthActions();
@@ -91,7 +105,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
   };
 
   return (
-    <AdminContext.Provider value={{ isAdmin, toggleAdmin }}>
+    <AdminContext.Provider value={{ isAdmin, toggleAdmin, isOnline }}>
       <div className="h-dvh bg-muted/50 flex justify-center selection:bg-primary/20 overflow-hidden" dir="rtl">
         <div className="w-full max-w-md bg-background shadow-2xl h-dvh relative flex flex-col overflow-hidden sm:border-x sm:border-border" style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}>
           <header className="pb-6 px-6 bg-gradient-to-br from-primary via-primary to-[hsl(var(--primary)/0.85)] text-primary-foreground rounded-b-[2rem] shadow-lg z-10 relative" style={{ paddingTop: "calc(2.5rem + env(safe-area-inset-top))" }}>
@@ -181,6 +195,15 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 space-y-4 z-0">
+            {!isOnline && (
+              <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-amber-800" data-testid="offline-banner">
+                <CloudOff className="w-4 h-4 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold">מצב לא מקוון</p>
+                  <p className="text-[10px] opacity-75">מציג נתונים שמורים · שינויים לא יישמרו</p>
+                </div>
+              </div>
+            )}
             {activeTab === "itinerary" && <ItineraryView tripId={tripId} />}
             {activeTab === "hotels" && <HotelsView tripId={tripId} />}
             {activeTab === "currency" && <CurrencyView />}
@@ -261,9 +284,11 @@ function getClothingAdvice(weatherTemp: string, weatherIcon: string): string[] {
 
 function DayCard({ day, tripId }: { day: Doc<"tripDays">; tripId: string }) {
   const [expanded, setExpanded] = useState(false);
-  const { isAdmin } = useAdmin();
-  const events = useQuery(api.dayEvents.listByDay, expanded ? { dayId: day._id } : "skip");
-  const dayAttractions = useQuery(api.attractions.listByDay, expanded ? { dayId: day._id } : "skip");
+  const { isAdmin, isOnline } = useAdmin();
+  const eventsLive = useQuery(api.dayEvents.listByDay, expanded ? { dayId: day._id } : "skip");
+  const attractionsLive = useQuery(api.attractions.listByDay, expanded ? { dayId: day._id } : "skip");
+  const events = useWithCache(eventsLive, `fnav-events-${day._id}`);
+  const dayAttractions = useWithCache(attractionsLive, `fnav-attr-${day._id}`);
 
   const updateDay = useMutation(api.tripDays.update);
   const deleteDay = useMutation(api.tripDays.remove);
@@ -315,6 +340,7 @@ function DayCard({ day, tripId }: { day: Doc<"tripDays">; tripId: string }) {
   };
 
   const handleSaveDay = async () => {
+    if (!isOnline) { alert("לא ניתן לשמור במצב לא מקוון"); return; }
     setSavingDay(true);
     try {
       await updateDay({
@@ -339,6 +365,7 @@ function DayCard({ day, tripId }: { day: Doc<"tripDays">; tripId: string }) {
 
   const handleSaveEvent = async () => {
     if (!editingEventId) return;
+    if (!isOnline) { alert("לא ניתן לשמור במצב לא מקוון"); return; }
     setSavingEvent(true);
     try {
       await updateEvent({ id: editingEventId as Id<"dayEvents">, time: editEventTime, title: editEventTitle, description: editEventDesc || undefined });
@@ -361,6 +388,7 @@ function DayCard({ day, tripId }: { day: Doc<"tripDays">; tripId: string }) {
 
   const handleSaveAttr = async () => {
     if (!editingAttrId) return;
+    if (!isOnline) { alert("לא ניתן לשמור במצב לא מקוון"); return; }
     setSavingAttr(true);
     try {
       await updateAttr({
@@ -675,7 +703,8 @@ function AttractionCard({ attraction, dayId, onDelete, onEdit }: { attraction: D
 }
 
 function ItineraryView({ tripId }: { tripId: string }) {
-  const days = useQuery(api.tripDays.list, { tripId: tripId as Id<"trips"> });
+  const daysLive = useQuery(api.tripDays.list, { tripId: tripId as Id<"trips"> });
+  const days = useWithCache(daysLive, `fnav-days-${tripId}`);
   if (days === undefined) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   return (
     <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
@@ -687,7 +716,8 @@ function ItineraryView({ tripId }: { tripId: string }) {
 
 function HotelsView({ tripId }: { tripId: string }) {
   const { isAdmin } = useAdmin();
-  const hotels = useQuery(api.accommodations.list, { tripId: tripId as Id<"trips"> });
+  const hotelsLive = useQuery(api.accommodations.list, { tripId: tripId as Id<"trips"> });
+  const hotels = useWithCache(hotelsLive, `fnav-hotels-${tripId}`);
   const [showDocDialog, setShowDocDialog] = useState<string | null>(null);
   const [docUrl, setDocUrl] = useState("");
   const [docName, setDocName] = useState("");
