@@ -855,6 +855,7 @@ function MapView() {
   const { data: locations = [], isLoading: locsLoading } = useQuery<MapLocation[]>({ queryKey: ["/api/map-locations"] });
   const { data: allAttractions = [] } = useQuery<(Attraction & { dayNumber: number; dayTitle: string })[]>({ queryKey: ["/api/all-attractions"] });
   const { data: hotels = [] } = useQuery<Accommodation[]>({ queryKey: ["/api/accommodations"] });
+  const { data: restaurantsList = [] } = useQuery<Restaurant[]>({ queryKey: ["/api/restaurants"] });
   const [showAdd, setShowAdd] = useState(false);
   const [newLoc, setNewLoc] = useState({ name: "", description: "", lat: "", lng: "", type: "attraction", icon: "" });
   const mapRef = useRef<any>(null);
@@ -898,6 +899,7 @@ function MapView() {
 
     const attractionIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#FF6B6B;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🏰</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
     const hotelIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#4ECDC4;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🏨</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
+    const restaurantIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#F59E0B;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🍽️</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
     const customIcon = L.divIcon({ className: "custom-marker", html: '<div style="background:#6C5CE7;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">📍</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
 
     allAttractions.forEach((attr) => {
@@ -922,7 +924,16 @@ function MapView() {
         .addTo(map)
         .bindPopup(`<div dir="rtl" style="text-align:right"><b>${loc.name}</b><br/>${loc.description || ""}</div>`);
     });
-  }, [mapReady, allAttractions, hotels, locations]);
+
+    restaurantsList.forEach((rest) => {
+      if (rest.lat && rest.lng) {
+        const navUrl = rest.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rest.address || rest.name)}`;
+        L.marker([rest.lat, rest.lng], { icon: restaurantIcon })
+          .addTo(map)
+          .bindPopup(`<div dir="rtl" style="text-align:right"><b>🍽️ ${rest.name}</b>${rest.cuisine ? `<br/><small>${rest.cuisine}</small>` : ""}${rest.priceRange ? `<br/><small>${rest.priceRange}</small>` : ""}${rest.notes ? `<br/><small>${rest.notes}</small>` : ""}<br/><a href="${navUrl}" target="_blank" style="color:#2563eb;font-size:12px;">נווט למסעדה →</a></div>`);
+      }
+    });
+  }, [mapReady, allAttractions, hotels, locations, restaurantsList]);
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
@@ -942,6 +953,7 @@ function MapView() {
       <div className="flex gap-2 flex-wrap px-1">
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#FF6B6B] inline-block"></span> אטרקציות</span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#4ECDC4] inline-block"></span> לינה</span>
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#F59E0B] inline-block"></span> מסעדות</span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><span className="w-3 h-3 rounded-full bg-[#6C5CE7] inline-block"></span> מותאם אישית</span>
       </div>
 
@@ -1333,7 +1345,7 @@ function RestaurantsView() {
   const { data: restaurants = [], isLoading } = useQuery<Restaurant[]>({ queryKey: ["/api/restaurants"] });
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0 });
+  const [form, setForm] = useState({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0, lat: "", lng: "" });
 
   const addMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/restaurants", data),
@@ -1348,7 +1360,7 @@ function RestaurantsView() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/restaurants"] }),
   });
 
-  const resetForm = () => setForm({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0 });
+  const resetForm = () => setForm({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0, lat: "", lng: "" });
 
   const cuisineOptions = [
     { value: "czech", label: "צ'כית", icon: "🇨🇿" },
@@ -1467,6 +1479,8 @@ function RestaurantsView() {
                               notes: r.notes || "",
                               isKosher: r.isKosher || false,
                               rating: r.rating || 0,
+                              lat: r.lat ? String(r.lat) : "",
+                              lng: r.lng ? String(r.lng) : "",
                             });
                             setEditingId(r.id);
                           }}
@@ -1521,6 +1535,11 @@ function RestaurantsView() {
               <Input placeholder="קישור Waze" value={form.wazeUrl} onChange={(e) => setForm({ ...form, wazeUrl: e.target.value })} className="flex-1" data-testid="input-restaurant-waze" />
             </div>
             <Textarea placeholder="הערות (כשרות, טיפים, המלצות...)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} data-testid="input-restaurant-notes" />
+            <div className="flex gap-2">
+              <Input placeholder="קו רוחב (lat)" value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value })} className="flex-1" data-testid="input-restaurant-lat" />
+              <Input placeholder="קו אורך (lng)" value={form.lng} onChange={(e) => setForm({ ...form, lng: e.target.value })} className="flex-1" data-testid="input-restaurant-lng" />
+            </div>
+            <p className="text-[10px] text-muted-foreground">מצאו קואורדינטות ב-Google Maps (לחצו ימני → "מה יש כאן?")</p>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={form.isKosher} onChange={(e) => setForm({ ...form, isKosher: e.target.checked })} className="rounded" data-testid="input-restaurant-kosher" />
               כשר
@@ -1529,7 +1548,7 @@ function RestaurantsView() {
               <Button
                 className="flex-1 h-10 text-sm rounded-xl bg-primary"
                 onClick={() => {
-                  const payload = { ...form, rating: form.rating || null, priceRange: form.priceRange || null, address: form.address || null, mapsUrl: form.mapsUrl || null, wazeUrl: form.wazeUrl || null, notes: form.notes || null, cuisine: form.cuisine || null };
+                  const payload = { ...form, rating: form.rating || null, priceRange: form.priceRange || null, address: form.address || null, mapsUrl: form.mapsUrl || null, wazeUrl: form.wazeUrl || null, notes: form.notes || null, cuisine: form.cuisine || null, lat: form.lat ? parseFloat(form.lat) : null, lng: form.lng ? parseFloat(form.lng) : null };
                   if (editingId) {
                     updateMutation.mutate({ id: editingId, data: payload });
                   } else {
