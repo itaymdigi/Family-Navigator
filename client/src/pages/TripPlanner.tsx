@@ -489,7 +489,7 @@ function DayCard({ day, tripId }: { day: Doc<"tripDays">; tripId: string }) {
                           {event.description && <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>}
                         </div>
                         {isAdmin && (
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex gap-1">
                             <button onClick={() => startEditEvent(event)} className="text-blue-400 hover:text-blue-600 p-1" data-testid={`button-edit-event-${event._id}`}>
                               <Pencil className="w-3 h-3" />
                             </button>
@@ -635,7 +635,7 @@ function AttractionCard({ attraction, dayId, onDelete, onEdit }: { attraction: D
   return (
     <div className="bg-muted/40 rounded-xl p-3 space-y-2.5 group relative" data-testid={`attraction-${attraction._id}`}>
       {useAdmin().isAdmin && (
-        <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <div className="absolute top-2 left-2 flex gap-1 z-10">
           <button onClick={onEdit} className="text-blue-400 hover:text-blue-600 p-1.5 bg-white/80 rounded-lg" data-testid={`button-edit-attr-${attraction._id}`}>
             <Pencil className="w-3 h-3" />
           </button>
