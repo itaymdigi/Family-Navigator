@@ -86,6 +86,7 @@ export default defineSchema({
     isSelected: v.optional(v.boolean()),
     reservationUrl: v.optional(v.string()),
     reservationName: v.optional(v.string()),
+    reservationStorageId: v.optional(v.id("_storage")),
   }).index("by_trip", ["tripId"]),
 
   // Restaurants
@@ -104,6 +105,7 @@ export default defineSchema({
     isKosher: v.optional(v.boolean()),
     isVisited: v.optional(v.boolean()),
     image: v.optional(v.string()),
+    imageStorageId: v.optional(v.id("_storage")),
   }).index("by_trip", ["tripId"]),
 
   // Family members
@@ -158,6 +160,7 @@ export default defineSchema({
     name: v.string(),
     type: v.string(),
     url: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
     notes: v.optional(v.string()),
     sortOrder: v.number(),
   }).index("by_trip", ["tripId"]),

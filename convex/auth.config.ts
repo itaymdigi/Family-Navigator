@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: "https://sleek-malamute-104.convex.site",
+      domain: process.env.CONVEX_SITE_URL ?? "https://sleek-malamute-104.convex.site",
       applicationID: "convex",
     },
   ],
