@@ -2,7 +2,7 @@ import { eq, asc } from "drizzle-orm";
 import { db } from "./db";
 import {
   tripDays, dayEvents, attractions, accommodations, photos, currencyRates, tips, familyMembers,
-  mapLocations, travelDocuments,
+  mapLocations, travelDocuments, restaurants,
   type TripDay, type InsertTripDay,
   type DayEvent, type InsertDayEvent,
   type Attraction, type InsertAttraction,
@@ -13,6 +13,7 @@ import {
   type FamilyMember, type InsertFamilyMember,
   type MapLocation, type InsertMapLocation,
   type TravelDocument, type InsertTravelDocument,
+  type Restaurant, type InsertRestaurant,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -61,6 +62,11 @@ export interface IStorage {
   createTravelDocument(doc: InsertTravelDocument): Promise<TravelDocument>;
   updateTravelDocument(id: number, doc: Partial<InsertTravelDocument>): Promise<TravelDocument>;
   deleteTravelDocument(id: number): Promise<void>;
+
+  getRestaurants(): Promise<Restaurant[]>;
+  createRestaurant(r: InsertRestaurant): Promise<Restaurant>;
+  updateRestaurant(id: number, r: Partial<InsertRestaurant>): Promise<Restaurant>;
+  deleteRestaurant(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -113,6 +119,11 @@ export class DatabaseStorage implements IStorage {
   async createTravelDocument(doc: InsertTravelDocument) { const [r] = await db.insert(travelDocuments).values(doc).returning(); return r; }
   async updateTravelDocument(id: number, doc: Partial<InsertTravelDocument>) { const [r] = await db.update(travelDocuments).set(doc).where(eq(travelDocuments.id, id)).returning(); return r; }
   async deleteTravelDocument(id: number) { await db.delete(travelDocuments).where(eq(travelDocuments.id, id)); }
+
+  async getRestaurants() { return db.select().from(restaurants).orderBy(asc(restaurants.id)); }
+  async createRestaurant(r: InsertRestaurant) { const [res] = await db.insert(restaurants).values(r).returning(); return res; }
+  async updateRestaurant(id: number, r: Partial<InsertRestaurant>) { const [res] = await db.update(restaurants).set(r).where(eq(restaurants.id, id)).returning(); return res; }
+  async deleteRestaurant(id: number) { await db.delete(restaurants).where(eq(restaurants.id, id)); }
 }
 
 export const storage = new DatabaseStorage();

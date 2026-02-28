@@ -6,7 +6,8 @@ import {
   ChevronDown, ChevronUp, Lightbulb, Camera, Trash2, Loader2,
   Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi,
   Filter, Maximize2, Lock, Unlock, FileText, FolderOpen, Globe,
-  Plane, CreditCard, FileCheck, MoreVertical
+  Plane, CreditCard, FileCheck, MoreVertical, UtensilsCrossed,
+  MapPinned, ThumbsUp, ThumbsDown
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { TripDay, DayEvent, Attraction, Accommodation, Photo, CurrencyRate, Tip, FamilyMember, MapLocation, TravelDocument } from "@shared/schema";
+import type { TripDay, DayEvent, Attraction, Accommodation, Photo, CurrencyRate, Tip, FamilyMember, MapLocation, TravelDocument, Restaurant } from "@shared/schema";
 
 const AdminContext = createContext<{ isAdmin: boolean; toggleAdmin: () => void }>({ isAdmin: false, toggleAdmin: () => {} });
 function useAdmin() { return useContext(AdminContext); }
@@ -33,12 +34,45 @@ function useOnlineStatus() {
   return online;
 }
 
+function useCountdown(targetDate: string) {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, isPast: false, isToday: false });
+  useEffect(() => {
+    const calc = () => {
+      const now = new Date().getTime();
+      const target = new Date(targetDate).getTime();
+      const diff = target - now;
+      if (diff <= 0) {
+        const tripEnd = new Date("2026-04-04T23:59:59").getTime();
+        if (now <= tripEnd) {
+          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isPast: false, isToday: true });
+        } else {
+          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isPast: true, isToday: false });
+        }
+        return;
+      }
+      setTimeLeft({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((diff % (1000 * 60)) / 1000),
+        isPast: false,
+        isToday: false,
+      });
+    };
+    calc();
+    const timer = setInterval(calc, 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+  return timeLeft;
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState("itinerary");
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [pin, setPin] = useState("");
   const isOnline = useOnlineStatus();
+  const countdown = useCountdown("2026-03-25T00:00:00");
 
   const ADMIN_PIN = "1234";
 
@@ -96,6 +130,33 @@ export default function Home() {
                 <span key={tag} className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-semibold">{tag}</span>
               ))}
             </div>
+            {!countdown.isPast && (
+              <div className="mt-3 bg-white/15 backdrop-blur-sm rounded-2xl p-3" data-testid="countdown-timer">
+                {countdown.isToday ? (
+                  <div className="text-center">
+                    <p className="text-lg font-bold animate-pulse">🎉 הטיול התחיל!</p>
+                    <p className="text-[11px] opacity-90">תהנו מכל רגע בצ'כיה</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-[10px] font-semibold text-center opacity-80 mb-1.5">⏳ ספירה לאחור לטיול</p>
+                    <div className="flex justify-center gap-2">
+                      {[
+                        { value: countdown.days, label: "ימים" },
+                        { value: countdown.hours, label: "שעות" },
+                        { value: countdown.minutes, label: "דקות" },
+                        { value: countdown.seconds, label: "שניות" },
+                      ].map((item) => (
+                        <div key={item.label} className="bg-white/20 rounded-xl px-2.5 py-1.5 min-w-[52px] text-center">
+                          <div className="text-lg font-bold tabular-nums leading-tight">{String(item.value).padStart(2, "0")}</div>
+                          <div className="text-[9px] font-medium opacity-80">{item.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             {isAdmin && (
               <div className="mt-3 bg-green-500/20 backdrop-blur-sm px-3 py-1.5 rounded-full text-center">
                 <span className="text-[11px] font-bold">מצב עריכה פעיל - ניתן להוסיף, לערוך ולמחוק</span>
@@ -110,17 +171,19 @@ export default function Home() {
             {activeTab === "map" && <MapView />}
             {activeTab === "photos" && <PhotosView />}
             {activeTab === "docs" && <DocsView />}
+            {activeTab === "food" && <RestaurantsView />}
             {activeTab === "tips" && <TipsView />}
           </main>
 
           <nav className="absolute bottom-0 left-0 w-full bg-white border-t border-border px-1 py-3 flex justify-between items-center rounded-t-3xl shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-20">
-            <NavItem icon={<CalendarDays className="w-5 h-5" />} label="מסלול" isActive={activeTab === "itinerary"} onClick={() => setActiveTab("itinerary")} />
-            <NavItem icon={<Hotel className="w-5 h-5" />} label="לינה" isActive={activeTab === "hotels"} onClick={() => setActiveTab("hotels")} />
-            <NavItem icon={<Globe className="w-5 h-5" />} label="מפה" isActive={activeTab === "map"} onClick={() => setActiveTab("map")} />
-            <NavItem icon={<Calculator className="w-5 h-5" />} label="מט״ח" isActive={activeTab === "currency"} onClick={() => setActiveTab("currency")} />
-            <NavItem icon={<ImageIcon className="w-5 h-5" />} label="תמונות" isActive={activeTab === "photos"} onClick={() => setActiveTab("photos")} />
-            <NavItem icon={<FolderOpen className="w-5 h-5" />} label="מסמכים" isActive={activeTab === "docs"} onClick={() => setActiveTab("docs")} />
-            <NavItem icon={<Lightbulb className="w-5 h-5" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
+            <NavItem icon={<CalendarDays className="w-4.5 h-4.5" />} label="מסלול" isActive={activeTab === "itinerary"} onClick={() => setActiveTab("itinerary")} />
+            <NavItem icon={<Hotel className="w-4.5 h-4.5" />} label="לינה" isActive={activeTab === "hotels"} onClick={() => setActiveTab("hotels")} />
+            <NavItem icon={<Globe className="w-4.5 h-4.5" />} label="מפה" isActive={activeTab === "map"} onClick={() => setActiveTab("map")} />
+            <NavItem icon={<Calculator className="w-4.5 h-4.5" />} label="מט״ח" isActive={activeTab === "currency"} onClick={() => setActiveTab("currency")} />
+            <NavItem icon={<ImageIcon className="w-4.5 h-4.5" />} label="תמונות" isActive={activeTab === "photos"} onClick={() => setActiveTab("photos")} />
+            <NavItem icon={<FolderOpen className="w-4.5 h-4.5" />} label="מסמכים" isActive={activeTab === "docs"} onClick={() => setActiveTab("docs")} />
+            <NavItem icon={<UtensilsCrossed className="w-4.5 h-4.5" />} label="אוכל" isActive={activeTab === "food"} onClick={() => setActiveTab("food")} />
+            <NavItem icon={<Lightbulb className="w-4.5 h-4.5" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
           </nav>
 
           <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
@@ -155,9 +218,9 @@ export default function Home() {
 function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode; label: string; isActive: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} data-testid={`nav-${label}`}
-      className={`flex flex-col items-center gap-1 transition-all duration-300 ease-out flex-1 ${isActive ? "text-primary scale-105" : "text-muted-foreground hover:text-foreground"}`}>
-      <div className={`${isActive ? "bg-primary/10 text-primary" : "text-muted-foreground"} p-2 rounded-2xl transition-colors duration-300`}>{icon}</div>
-      <span className={`text-[10px] font-semibold ${isActive ? "opacity-100" : "opacity-70"}`}>{label}</span>
+      className={`flex flex-col items-center gap-0.5 transition-all duration-300 ease-out flex-1 min-w-0 ${isActive ? "text-primary scale-105" : "text-muted-foreground hover:text-foreground"}`}>
+      <div className={`${isActive ? "bg-primary/10 text-primary" : "text-muted-foreground"} p-1.5 rounded-xl transition-colors duration-300`}>{icon}</div>
+      <span className={`text-[9px] font-semibold ${isActive ? "opacity-100" : "opacity-70"} truncate max-w-full`}>{label}</span>
     </button>
   );
 }
@@ -1258,6 +1321,218 @@ function DocsView() {
             >
               {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />} שמור מסמך
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function RestaurantsView() {
+  const { isAdmin } = useAdmin();
+  const { data: restaurants = [], isLoading } = useQuery<Restaurant[]>({ queryKey: ["/api/restaurants"] });
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0 });
+
+  const addMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/restaurants", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/restaurants"] }); setShowAdd(false); resetForm(); },
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/restaurants/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/restaurants"] }); setEditingId(null); },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/restaurants/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/restaurants"] }),
+  });
+
+  const resetForm = () => setForm({ name: "", cuisine: "", priceRange: "", address: "", mapsUrl: "", wazeUrl: "", notes: "", isKosher: false, rating: 0 });
+
+  const cuisineOptions = [
+    { value: "czech", label: "צ'כית", icon: "🇨🇿" },
+    { value: "italian", label: "איטלקית", icon: "🇮🇹" },
+    { value: "asian", label: "אסייתית", icon: "🍜" },
+    { value: "burger", label: "המבורגרים", icon: "🍔" },
+    { value: "pizza", label: "פיצה", icon: "🍕" },
+    { value: "cafe", label: "בית קפה", icon: "☕" },
+    { value: "bakery", label: "מאפייה", icon: "🥐" },
+    { value: "local", label: "מקומי", icon: "🍽️" },
+    { value: "other", label: "אחר", icon: "🍴" },
+  ];
+
+  const getCuisineInfo = (cuisine: string | null) => cuisineOptions.find(c => c.value === cuisine) || { value: "other", label: "מסעדה", icon: "🍴" };
+
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
+      <div className="flex justify-between items-center px-1">
+        <h2 className="text-lg font-bold text-foreground tracking-tight">🍽️ מסעדות ואוכל</h2>
+        {isAdmin && (
+          <Button variant="ghost" size="icon" className="text-primary hover:text-primary hover:bg-primary/10 rounded-full h-9 w-9" onClick={() => { resetForm(); setShowAdd(true); }} data-testid="button-add-restaurant">
+            <Plus className="w-4 h-4" strokeWidth={2.5} />
+          </Button>
+        )}
+      </div>
+
+      <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🍺</span>
+            <div>
+              <h3 className="font-bold text-sm">המטבח הצ'כי</h3>
+              <p className="text-xs text-muted-foreground">נסו סביצ'קובה, טרדלו, גולאש צ'כי ובירה מקומית!</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {restaurants.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <UtensilsCrossed className="w-12 h-12 mx-auto mb-4 opacity-40" />
+          <p className="font-medium">אין מסעדות ברשימה</p>
+          <p className="text-xs mt-1">הוסיפו מסעדות שרוצים לנסות בטיול</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {restaurants.map((r) => {
+            const ci = getCuisineInfo(r.cuisine);
+            return (
+              <Card key={r.id} className={`border-none shadow-sm rounded-xl group transition-all ${r.isVisited ? "bg-green-50/50" : "bg-white"}`} data-testid={`restaurant-${r.id}`}>
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-lg flex-shrink-0">
+                      {ci.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm truncate">{r.name}</p>
+                        {r.isKosher && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">כשר</span>}
+                        {r.isVisited && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">ביקרנו ✓</span>}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700">{ci.label}</span>
+                        {r.priceRange && <span className="text-[10px] text-muted-foreground">{r.priceRange}</span>}
+                        {r.rating && r.rating > 0 && (
+                          <span className="text-[10px] text-amber-600 font-bold flex items-center gap-0.5">
+                            {"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}
+                          </span>
+                        )}
+                      </div>
+                      {r.address && <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1"><MapPin className="w-3 h-3 flex-shrink-0" />{r.address}</p>}
+                      {r.notes && <p className="text-[11px] text-muted-foreground mt-1">{r.notes}</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2 justify-end">
+                    {r.mapsUrl && (
+                      <a href={r.mapsUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors" data-testid={`link-maps-${r.id}`}>
+                        Google Maps
+                      </a>
+                    )}
+                    {r.wazeUrl && (
+                      <a href={r.wazeUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-600 hover:bg-cyan-100 transition-colors" data-testid={`link-waze-${r.id}`}>
+                        Waze
+                      </a>
+                    )}
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={() => updateMutation.mutate({ id: r.id, data: { isVisited: !r.isVisited } })}
+                          className={`p-1.5 rounded-lg transition-colors ${r.isVisited ? "bg-green-100 text-green-600" : "bg-gray-50 text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
+                          data-testid={`button-toggle-visited-${r.id}`}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setForm({
+                              name: r.name,
+                              cuisine: r.cuisine || "",
+                              priceRange: r.priceRange || "",
+                              address: r.address || "",
+                              mapsUrl: r.mapsUrl || "",
+                              wazeUrl: r.wazeUrl || "",
+                              notes: r.notes || "",
+                              isKosher: r.isKosher || false,
+                              rating: r.rating || 0,
+                            });
+                            setEditingId(r.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary p-1.5 transition-all"
+                          data-testid={`button-edit-restaurant-${r.id}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => deleteMutation.mutate(r.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1.5 transition-all" data-testid={`button-delete-restaurant-${r.id}`}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={showAdd || editingId !== null} onOpenChange={(open) => { if (!open) { setShowAdd(false); setEditingId(null); resetForm(); } }}>
+        <DialogContent className="max-w-[90vw] rounded-2xl max-h-[85vh] overflow-y-auto" dir="rtl">
+          <DialogHeader><DialogTitle>{editingId ? "עריכת מסעדה" : "הוספת מסעדה"}</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Input placeholder="שם המסעדה" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="input-restaurant-name" />
+            <Select value={form.cuisine} onValueChange={(v) => setForm({ ...form, cuisine: v })}>
+              <SelectTrigger><SelectValue placeholder="סוג מטבח" /></SelectTrigger>
+              <SelectContent>
+                {cuisineOptions.map(c => (
+                  <SelectItem key={c.value} value={c.value}>{c.icon} {c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Input placeholder="טווח מחירים (למשל €8–15)" value={form.priceRange} onChange={(e) => setForm({ ...form, priceRange: e.target.value })} className="flex-1" data-testid="input-restaurant-price" />
+              <Select value={String(form.rating)} onValueChange={(v) => setForm({ ...form, rating: parseInt(v) })}>
+                <SelectTrigger className="w-28"><SelectValue placeholder="דירוג" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">ללא דירוג</SelectItem>
+                  <SelectItem value="1">★</SelectItem>
+                  <SelectItem value="2">★★</SelectItem>
+                  <SelectItem value="3">★★★</SelectItem>
+                  <SelectItem value="4">★★★★</SelectItem>
+                  <SelectItem value="5">★★★★★</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Input placeholder="כתובת" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} data-testid="input-restaurant-address" />
+            <div className="flex gap-2">
+              <Input placeholder="קישור Google Maps" value={form.mapsUrl} onChange={(e) => setForm({ ...form, mapsUrl: e.target.value })} className="flex-1" data-testid="input-restaurant-maps" />
+              <Input placeholder="קישור Waze" value={form.wazeUrl} onChange={(e) => setForm({ ...form, wazeUrl: e.target.value })} className="flex-1" data-testid="input-restaurant-waze" />
+            </div>
+            <Textarea placeholder="הערות (כשרות, טיפים, המלצות...)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} data-testid="input-restaurant-notes" />
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={form.isKosher} onChange={(e) => setForm({ ...form, isKosher: e.target.checked })} className="rounded" data-testid="input-restaurant-kosher" />
+              כשר
+            </label>
+            <div className="flex gap-2 pt-1">
+              <Button
+                className="flex-1 h-10 text-sm rounded-xl bg-primary"
+                onClick={() => {
+                  const payload = { ...form, rating: form.rating || null, priceRange: form.priceRange || null, address: form.address || null, mapsUrl: form.mapsUrl || null, wazeUrl: form.wazeUrl || null, notes: form.notes || null, cuisine: form.cuisine || null };
+                  if (editingId) {
+                    updateMutation.mutate({ id: editingId, data: payload });
+                  } else {
+                    addMutation.mutate(payload);
+                  }
+                }}
+                disabled={!form.name || addMutation.isPending || updateMutation.isPending}
+                data-testid="button-save-restaurant"
+              >
+                {(addMutation.isPending || updateMutation.isPending) ? <Loader2 className="w-4 h-4 animate-spin" /> : editingId ? "עדכן" : "הוסף"}
+              </Button>
+              <Button variant="outline" className="h-10 text-sm rounded-xl" onClick={() => { setShowAdd(false); setEditingId(null); resetForm(); }}>ביטול</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

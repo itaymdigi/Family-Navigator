@@ -167,3 +167,24 @@ export type Conversation = typeof conversations.$inferSelect;
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;
+
+export const restaurants = pgTable("restaurants", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  cuisine: text("cuisine"),
+  priceRange: text("price_range"),
+  rating: integer("rating"),
+  address: text("address"),
+  lat: real("lat"),
+  lng: real("lng"),
+  mapsUrl: text("maps_url"),
+  wazeUrl: text("waze_url"),
+  notes: text("notes"),
+  isKosher: boolean("is_kosher").default(false),
+  isVisited: boolean("is_visited").default(false),
+  image: text("image"),
+});
+
+export const insertRestaurantSchema = createInsertSchema(restaurants).omit({ id: true });
+export type InsertRestaurant = z.infer<typeof insertRestaurantSchema>;
+export type Restaurant = typeof restaurants.$inferSelect;

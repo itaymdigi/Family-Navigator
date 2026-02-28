@@ -6,6 +6,7 @@ import {
   insertTripDaySchema, insertDayEventSchema, insertAttractionSchema,
   insertAccommodationSchema, insertPhotoSchema, insertTipSchema,
   insertFamilyMemberSchema, insertMapLocationSchema, insertTravelDocumentSchema,
+  insertRestaurantSchema,
   tripDays, dayEvents, attractions, accommodations, tips,
 } from "@shared/schema";
 import OpenAI from "openai";
@@ -261,6 +262,25 @@ export async function registerRoutes(
     const id = parseId(req.params.id);
     if (!id) return res.status(400).json({ message: "Invalid id" });
     await storage.deleteTravelDocument(id);
+    res.status(204).send();
+  });
+
+  // Restaurants
+  app.get("/api/restaurants", async (_req, res) => { res.json(await storage.getRestaurants()); });
+  app.post("/api/restaurants", async (req, res) => {
+    const p = insertRestaurantSchema.safeParse(req.body);
+    if (!p.success) return res.status(400).json({ message: p.error.message });
+    res.status(201).json(await storage.createRestaurant(p.data));
+  });
+  app.patch("/api/restaurants/:id", async (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ message: "Invalid id" });
+    res.json(await storage.updateRestaurant(id, req.body));
+  });
+  app.delete("/api/restaurants/:id", async (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ message: "Invalid id" });
+    await storage.deleteRestaurant(id);
     res.status(204).send();
   });
 
