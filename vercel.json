@@ -2,6 +2,9 @@
   "buildCommand": "bun run build",
   "outputDirectory": "dist/public",
   "framework": "vite",
+  "rewrites": [
+    { "source": "/((?!assets/).*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
