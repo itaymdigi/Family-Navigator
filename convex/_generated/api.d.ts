@@ -12,6 +12,7 @@ import type * as accommodations from "../accommodations.js";
 import type * as admin from "../admin.js";
 import type * as attractions from "../attractions.js";
 import type * as auth from "../auth.js";
+import type * as checklistItems from "../checklistItems.js";
 import type * as conversations from "../conversations.js";
 import type * as currencyRates from "../currencyRates.js";
 import type * as dayEvents from "../dayEvents.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   attractions: typeof attractions;
   auth: typeof auth;
+  checklistItems: typeof checklistItems;
   conversations: typeof conversations;
   currencyRates: typeof currencyRates;
   dayEvents: typeof dayEvents;

@@ -165,6 +165,16 @@ export default defineSchema({
     sortOrder: v.number(),
   }).index("by_trip", ["tripId"]),
 
+  // Pre-trip checklist
+  checklistItems: defineTable({
+    tripId: v.id("trips"),
+    title: v.string(),
+    isDone: v.boolean(),
+    dueDate: v.optional(v.string()),
+    note: v.optional(v.string()),
+    sortOrder: v.number(),
+  }).index("by_trip", ["tripId"]),
+
   // Packing list items
   packingItems: defineTable({
     tripId: v.id("trips"),

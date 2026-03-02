@@ -8,7 +8,7 @@ import {
   Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi,
   Filter, Maximize2, Lock, Unlock, FileText, FolderOpen, Globe,
   Plane, CreditCard, FileCheck, MoreVertical, UtensilsCrossed,
-  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, Home, Package
+  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, Home, Package, ListChecks
 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -212,6 +212,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
             {activeTab === "food" && <RestaurantsView tripId={tripId} />}
             {activeTab === "tips" && <TipsView tripId={tripId} />}
             {activeTab === "packing" && <PackingView tripId={tripId} />}
+            {activeTab === "checklist" && <ChecklistView tripId={tripId} />}
           </main>
 
           <nav className="absolute bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-border rounded-t-3xl shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.12)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
@@ -225,6 +226,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
               <NavItem icon={<UtensilsCrossed className="w-[18px] h-[18px]" />} label="אוכל" isActive={activeTab === "food"} onClick={() => setActiveTab("food")} />
               <NavItem icon={<Lightbulb className="w-[18px] h-[18px]" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
               <NavItem icon={<Package className="w-[18px] h-[18px]" />} label="ציוד" isActive={activeTab === "packing"} onClick={() => setActiveTab("packing")} />
+              <NavItem icon={<ListChecks className="w-[18px] h-[18px]" />} label="משימות" isActive={activeTab === "checklist"} onClick={() => setActiveTab("checklist")} />
             </div>
           </nav>
         </div>
@@ -2160,6 +2162,186 @@ function AddPackingItemForm({ tripId, onDone }: { tripId: string; onDone: () => 
         </div>
         <div className="flex gap-2">
           <Button size="sm" className="h-8 text-xs rounded-lg bg-primary" onClick={handleSave} disabled={!name.trim() || saving}>
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : "הוסף"}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 text-xs rounded-lg" onClick={onDone}>ביטול</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Pre-trip Checklist ───────────────────────────────────────────────────────
+
+function ChecklistView({ tripId }: { tripId: string }) {
+  const { isAdmin } = useAdmin();
+  const items = useQuery(api.checklistItems.list, { tripId: tripId as Id<"trips"> });
+  const toggleDone = useMutation(api.checklistItems.toggleDone);
+  const removeItem = useMutation(api.checklistItems.remove);
+  const [showAdd, setShowAdd] = useState(false);
+
+  if (items === undefined) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+
+  const total = items.length;
+  const done = items.filter((i) => i.isDone).length;
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+
+  const today = new Date().toISOString().split("T")[0];
+  const pending = items.filter((i) => !i.isDone);
+  const completed = items.filter((i) => i.isDone);
+
+  const formatDue = (d: string) => {
+    const date = new Date(d + "T00:00:00");
+    const diff = Math.ceil((date.getTime() - new Date(today + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24));
+    if (diff < 0) return { label: `באיחור ${Math.abs(diff)} ימים`, cls: "text-red-500 bg-red-50" };
+    if (diff === 0) return { label: "היום!", cls: "text-orange-500 bg-orange-50" };
+    if (diff === 1) return { label: "מחר", cls: "text-yellow-600 bg-yellow-50" };
+    return { label: `עוד ${diff} ימים`, cls: "text-muted-foreground bg-muted" };
+  };
+
+  const ItemRow = ({ item }: { item: (typeof items)[0] }) => (
+    <div className="flex items-start gap-2.5 py-2 group border-b border-border/40 last:border-0">
+      <button
+        onClick={() => toggleDone({ id: item._id, isDone: !item.isDone })}
+        className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+          item.isDone ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-primary"
+        }`}
+      >
+        {item.isDone && <Check className="w-3 h-3" />}
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm leading-snug ${item.isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>
+          {item.title}
+        </p>
+        {item.note && <p className="text-[11px] text-muted-foreground mt-0.5">{item.note}</p>}
+      </div>
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        {item.dueDate && !item.isDone && (() => {
+          const { label, cls } = formatDue(item.dueDate);
+          return <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cls}`}>{label}</span>;
+        })()}
+        {isAdmin && (
+          <button
+            onClick={() => removeItem({ id: item._id })}
+            className="opacity-0 group-hover:opacity-60 text-red-400 hover:text-red-600 transition-opacity p-0.5"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-lg font-bold text-foreground tracking-tight">✅ משימות לפני הטיול</h2>
+        <span className="text-sm font-medium text-muted-foreground">{done}/{total} הושלמו</span>
+      </div>
+
+      {total > 0 && (
+        <div className="space-y-1.5">
+          <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${pct}%`, background: pct === 100 ? "#22c55e" : "linear-gradient(90deg,#f59e0b,#10b981)" }}
+            />
+          </div>
+          {pct === 100 && <p className="text-xs text-green-600 font-medium text-center">🎉 כל המשימות הושלמו! הטיול מוכן!</p>}
+        </div>
+      )}
+
+      {pending.length > 0 && (
+        <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white">
+          <CardContent className="p-4">
+            <p className="text-xs font-semibold text-muted-foreground mb-2">ממתינות לביצוע</p>
+            {pending.map((item) => <ItemRow key={item._id} item={item} />)}
+          </CardContent>
+        </Card>
+      )}
+
+      {completed.length > 0 && (
+        <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white">
+          <CardContent className="p-4">
+            <p className="text-xs font-semibold text-muted-foreground mb-2">הושלמו ✓</p>
+            {completed.map((item) => <ItemRow key={item._id} item={item} />)}
+          </CardContent>
+        </Card>
+      )}
+
+      {total === 0 && !showAdd && (
+        <div className="text-center py-12 text-muted-foreground text-sm">עדיין אין משימות לפני הטיול</div>
+      )}
+
+      {isAdmin && (
+        showAdd
+          ? <AddChecklistItemForm tripId={tripId} sortOrder={total + 1} onDone={() => setShowAdd(false)} />
+          : <button onClick={() => setShowAdd(true)} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 py-1 px-1">
+              <Plus className="w-3 h-3" /> הוסף משימה
+            </button>
+      )}
+    </div>
+  );
+}
+
+function AddChecklistItemForm({ tripId, sortOrder, onDone }: { tripId: string; sortOrder: number; onDone: () => void }) {
+  const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const addItem = useMutation(api.checklistItems.create);
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      await addItem({
+        tripId: tripId as Id<"trips">,
+        title: title.trim(),
+        dueDate: dueDate || undefined,
+        note: note.trim() || undefined,
+        sortOrder,
+      });
+      setTitle(""); setDueDate(""); setNote("");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white">
+      <CardContent className="p-4 space-y-3">
+        <p className="text-xs font-semibold text-muted-foreground">משימה חדשה</p>
+        <Input
+          placeholder="שם המשימה..."
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSave()}
+          className="h-9 text-sm"
+          autoFocus
+        />
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Label className="text-[10px] text-muted-foreground mb-1 block">תאריך יעד (אופציונלי)</Label>
+            <Input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="flex-1">
+            <Label className="text-[10px] text-muted-foreground mb-1 block">הערה (אופציונלי)</Label>
+            <Input
+              placeholder="הערה..."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" className="h-8 text-xs rounded-lg bg-primary" onClick={handleSave} disabled={!title.trim() || saving}>
             {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : "הוסף"}
           </Button>
           <Button size="sm" variant="ghost" className="h-8 text-xs rounded-lg" onClick={onDone}>ביטול</Button>
