@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Loader2, Plus, MapPin, Calendar as CalendarIcon, LogOut, Trash2, Users, Eye, EyeOff, ShieldCheck, UserRound } from "lucide-react";
+import { Plus, MapPin, Calendar as CalendarIcon, LogOut, Trash2, Users, Eye, EyeOff, ShieldCheck, UserRound, ChevronLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -131,136 +131,174 @@ export default function TripDashboard() {
     }
   };
 
+  // ── Skeleton loading ─────────────────────────────────────────────────
   if (trips === undefined) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      <div dir="rtl" className="h-dvh bg-background flex flex-col">
+        {/* Header skeleton */}
+        <div className="bg-background border-b border-border px-4 flex items-center justify-between gap-3 flex-shrink-0" style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))", paddingBottom: "0.875rem" }}>
+          <div className="space-y-1.5">
+            <div className="h-5 w-28 rounded-lg bg-muted animate-pulse" />
+            <div className="h-3.5 w-20 rounded bg-muted animate-pulse" />
+          </div>
+          <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
+        </div>
+        {/* Card skeletons */}
+        <div className="flex-1 overflow-hidden p-4 space-y-3">
+          <div className="h-3.5 w-16 rounded bg-muted animate-pulse mb-4" />
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-[76px] rounded-2xl bg-muted animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+          ))}
+        </div>
       </div>
     );
   }
 
-  return (
-    <div dir="rtl" className="min-h-dvh bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))", paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
-      <div className="max-w-md mx-auto">
-        <div className="flex justify-between items-center mb-8 pt-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">הטיולים שלנו</h1>
-            <p className="text-gray-500 text-sm mt-1">Family Navigator</p>
+  // ── Trip card + section helpers ───────────────────────────────────────
+  const today = new Date().toISOString().split("T")[0];
+  const active   = trips.filter((t) => t.startDate <= today && t.endDate >= today);
+  const upcoming = trips.filter((t) => t.startDate > today);
+  const past     = trips.filter((t) => t.endDate < today);
+
+  const fmtDate = (d: string) => {
+    const [, m, day] = d.split("-");
+    return `${day}.${m}`;
+  };
+
+  const TripCard = ({ trip, dim }: { trip: typeof trips[0]; dim?: boolean }) => {
+    const isActive = trip.startDate <= today && trip.endDate >= today;
+    return (
+      <div
+        onClick={() => navigate(`/trips/${trip._id}`)}
+        className={`card-pressable w-full bg-card rounded-2xl shadow-sm border border-border overflow-hidden ${dim ? "opacity-40 grayscale saturate-0" : ""}`}
+        data-testid={`trip-card-${trip._id}`}
+      >
+        <div className="flex items-center gap-3 px-4 py-3.5">
+          {/* Status stripe */}
+          {isActive && <div className="absolute right-0 top-0 h-full w-1 bg-green-400 rounded-r-2xl" aria-hidden />}
+          {/* Emoji badge */}
+          <div className="size-12 rounded-xl bg-muted flex items-center justify-center text-2xl flex-shrink-0 select-none">
+            {trip.coverEmoji || "✈️"}
           </div>
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-              <>
-                <Button
-                  onClick={() => setShowUsers(true)}
-                  variant="outline"
-                  className="rounded-xl shadow-sm gap-2"
-                  data-testid="button-manage-users"
-                >
-                  <Users className="w-4 h-4" />
-                  משתמשים
-                </Button>
-                <Button
-                  onClick={() => setShowNew(true)}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg hover:from-blue-600 hover:to-indigo-700 gap-2"
-                  data-testid="button-new-trip"
-                >
-                  <Plus className="w-4 h-4" />
-                  טיול חדש
-                </Button>
-              </>
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <h2 className="font-bold text-foreground text-fluid-base text-balance leading-tight truncate">{trip.name}</h2>
+            <div className="flex items-center gap-1 text-muted-foreground mt-0.5" style={{ fontSize: "clamp(0.625rem, 2vw, 0.75rem)" }}>
+              <MapPin className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{trip.destination}</span>
+            </div>
+            {(trip.startDate || trip.endDate) && (
+              <div className="flex items-center gap-1 text-muted-foreground mt-0.5 tabular-nums" style={{ fontSize: "clamp(0.625rem, 2vw, 0.75rem)" }}>
+                <CalendarIcon className="w-3 h-3 flex-shrink-0" />
+                <span>
+                  {trip.startDate && trip.endDate
+                    ? `${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)}`
+                    : trip.startDate || trip.endDate}
+                </span>
+              </div>
             )}
-            <button
-              onClick={() => signOut()}
-              className="p-2 rounded-xl bg-white shadow-sm text-gray-400 hover:text-red-500 hover:shadow-md transition-all"
-              title="התנתק"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+          </div>
+          {/* Actions */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {isAdmin && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setTripToDelete(trip._id); }}
+                className="size-8 flex items-center justify-center rounded-xl text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 transition-colors"
+                aria-label="מחק טיול"
+                data-testid={`button-delete-trip-${trip._id}`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <ChevronLeft className="w-4 h-4 text-muted-foreground/40" aria-hidden />
           </div>
         </div>
+        {trip.description && (
+          <p className="px-4 pb-3 -mt-1 text-muted-foreground line-clamp-1 text-pretty" style={{ fontSize: "clamp(0.625rem, 2vw, 0.75rem)" }}>{trip.description}</p>
+        )}
+      </div>
+    );
+  };
 
-        {trips.length === 0 ? (
-          <div className="text-center py-20 text-gray-400">
-            <div className="text-6xl mb-4">🗺️</div>
-            <p className="font-semibold text-lg">אין טיולים עדיין</p>
-            {isAdmin && (
-              <p className="text-sm mt-2">לחצו על "טיול חדש" כדי להתחיל</p>
-            )}
-          </div>
-        ) : (() => {
-          const today = new Date().toISOString().split("T")[0];
-          const active = trips.filter((t) => t.startDate <= today && t.endDate >= today);
-          const upcoming = trips.filter((t) => t.startDate > today);
-          const past = trips.filter((t) => t.endDate < today);
+  const Section = ({ label, badge, badgeClass, items, dim }: { label: string; badge: string; badgeClass: string; items: typeof trips; dim?: boolean }) =>
+    items.length === 0 ? null : (
+      <div className="space-y-2.5">
+        <div className="section-label px-1">
+          <span className={`text-fluid-xs font-bold px-2.5 py-0.5 rounded-full flex-shrink-0 ${badgeClass}`}>{badge}</span>
+          <span className="text-fluid-xs font-semibold text-muted-foreground">{label}</span>
+        </div>
+        {items.map((trip) => <TripCard key={trip._id} trip={trip} dim={dim} />)}
+      </div>
+    );
 
-          const TripCard = ({ trip, dim }: { trip: typeof trips[0]; dim?: boolean }) => (
-            <div
-              key={trip._id}
-              onClick={() => navigate(`/trips/${trip._id}`)}
-              className={`w-full text-right bg-white rounded-2xl shadow-md hover:shadow-lg transition-all hover:scale-[1.01] overflow-hidden cursor-pointer ${dim ? "opacity-50 grayscale" : ""}`}
-              data-testid={`trip-card-${trip._id}`}
-            >
-              <div className="bg-gradient-to-br from-blue-500 to-indigo-600 px-6 py-5 text-white relative">
-                {isAdmin && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setTripToDelete(trip._id); }}
-                    className="absolute top-3 left-3 p-1.5 rounded-lg bg-white/15 hover:bg-red-500/70 transition-colors"
-                    title="מחק טיול"
-                    data-testid={`button-delete-trip-${trip._id}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-3xl">{trip.coverEmoji || "✈️"}</span>
-                  <div>
-                    <h2 className="text-lg font-bold">{trip.name}</h2>
-                    <div className="flex items-center gap-1.5 text-white/80 text-xs mt-0.5">
-                      <MapPin className="w-3 h-3" />
-                      <span>{trip.destination}</span>
-                    </div>
-                  </div>
-                </div>
-                {(trip.startDate || trip.endDate) && (
-                  <div className="flex items-center gap-1.5 text-white/70 text-xs">
-                    <CalendarIcon className="w-3 h-3" />
-                    <span>
-                      {trip.startDate && trip.endDate
-                        ? `${trip.startDate} – ${trip.endDate}`
-                        : trip.startDate || trip.endDate}
-                    </span>
-                  </div>
-                )}
-              </div>
-              {trip.description && (
-                <div className="px-6 py-3">
-                  <p className="text-sm text-gray-600 text-right">{trip.description}</p>
-                </div>
+  return (
+    <div dir="rtl" className="h-dvh bg-muted/30 flex flex-col">
+      {/* ── App Bar ──────────────────────────────────────────────────────── */}
+      <header
+        className="bg-background border-b border-border flex items-center justify-between gap-3 px-4 flex-shrink-0 z-10"
+        style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))", paddingBottom: "0.875rem" }}
+      >
+        <div>
+          <h1 className="text-fluid-xl font-bold text-foreground text-balance leading-tight">הטיולים שלנו</h1>
+          <p className="text-fluid-xs text-muted-foreground">Family Navigator</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => setShowUsers(true)}
+                className="size-9 flex items-center justify-center rounded-xl bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                aria-label="ניהול משתמשים"
+                data-testid="button-manage-users"
+              >
+                <Users className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setShowNew(true)}
+                className="h-9 px-3.5 flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity"
+                data-testid="button-new-trip"
+              >
+                <Plus className="w-4 h-4" />
+                <span>טיול חדש</span>
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => void signOut()}
+            className="size-9 flex items-center justify-center rounded-xl bg-muted text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            aria-label="התנתק"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </header>
+
+      {/* ── Scrollable content ───────────────────────────────────────────── */}
+      <main className="app-scroll px-4 py-4" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
+        <div className="max-w-md mx-auto">
+          {trips.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground space-y-3">
+              <div className="text-6xl">🗺️</div>
+              <p className="font-semibold text-fluid-lg text-balance">אין טיולים עדיין</p>
+              {isAdmin && (
+                <button
+                  onClick={() => setShowNew(true)}
+                  className="mx-auto h-10 px-5 flex items-center gap-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  צור טיול ראשון
+                </button>
               )}
             </div>
-          );
-
-          const Section = ({ label, badge, badgeColor, items, dim }: { label: string; badge: string; badgeColor: string; items: typeof trips; dim?: boolean }) =>
-            items.length === 0 ? null : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 px-1">
-                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${badgeColor}`}>{badge}</span>
-                  <span className="text-sm font-semibold text-gray-500">{label}</span>
-                  <div className="flex-1 h-px bg-gray-200" />
-                </div>
-                {items.map((trip) => <TripCard key={trip._id} trip={trip} dim={dim} />)}
-              </div>
-            );
-
-          return (
+          ) : (
             <div className="space-y-6">
-              <Section label="מתרחש עכשיו" badge="פעיל" badgeColor="bg-green-100 text-green-700" items={active} />
-              <Section label="קרוב" badge="עתידי" badgeColor="bg-blue-100 text-blue-700" items={upcoming} />
-              <Section label="הסתיים" badge="עבר" badgeColor="bg-gray-100 text-gray-500" items={past} dim />
+              <Section label="מתרחש עכשיו" badge="פעיל" badgeClass="bg-green-100 text-green-700" items={active} />
+              <Section label="קרוב" badge="עתידי" badgeClass="bg-blue-100 text-blue-700" items={upcoming} />
+              <Section label="הסתיים" badge="עבר" badgeClass="bg-muted text-muted-foreground" items={past} dim />
             </div>
-          );
-        })()}
-      </div>
+          )}
+        </div>
+      </main>
 
       {/* User Management Dialog */}
       <Dialog open={showUsers} onOpenChange={setShowUsers}>
@@ -293,7 +331,7 @@ export default function TripDashboard() {
           </div>
           <Button
             onClick={() => setShowNewUser(true)}
-            className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white gap-2 mt-1"
+            className="w-full rounded-xl gap-2 mt-1"
           >
             <Plus className="w-4 h-4" />
             הוסף משתמש
@@ -369,7 +407,7 @@ export default function TripDashboard() {
             {userError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{userError}</p>}
             <div className="flex gap-2 pt-1">
               <Button
-                className="flex-1 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white"
+                className="flex-1 h-10 rounded-xl"
                 onClick={handleCreateUser}
                 disabled={!userForm.username || !userForm.displayName || userForm.password.length < 8 || userSaving}
               >
@@ -542,7 +580,7 @@ export default function TripDashboard() {
             </div>
             <div className="flex gap-2 pt-1">
               <Button
-                className="flex-1 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white"
+                className="flex-1 h-10 rounded-xl"
                 onClick={handleCreate}
                 disabled={!form.name || !form.destination || saving}
                 data-testid="button-save-trip"

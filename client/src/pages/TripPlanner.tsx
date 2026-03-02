@@ -110,18 +110,18 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
     <AdminContext.Provider value={{ isAdmin, toggleAdmin, isOnline }}>
       <div className="h-dvh bg-muted/50 flex justify-center selection:bg-primary/20 overflow-hidden" dir="rtl">
         <div className="w-full max-w-md bg-background shadow-2xl h-dvh relative flex flex-col overflow-hidden sm:border-x sm:border-border" style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}>
-          <header className="pb-6 px-6 bg-gradient-to-br from-primary via-primary to-[hsl(var(--primary)/0.85)] text-primary-foreground rounded-b-[2rem] shadow-lg z-10 relative" style={{ paddingTop: "calc(2.5rem + env(safe-area-inset-top))" }}>
+          <header className="pb-5 px-4 bg-primary text-primary-foreground rounded-b-[2rem] shadow-lg z-10 relative" style={{ paddingTop: "calc(1.75rem + env(safe-area-inset-top))" }}>
             <div className="flex justify-between items-center gap-2 mb-6">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-2xl flex-shrink-0">{trip?.coverEmoji ?? "✈️"}</span>
-                  <h1 className="text-xl font-bold tracking-tight truncate" data-testid="text-trip-title">{trip?.name ?? ""}</h1>
+                  <span className="text-fluid-2xl flex-shrink-0 leading-none">{trip?.coverEmoji ?? "✈️"}</span>
+                  <h1 className="text-fluid-xl font-bold tracking-tight truncate text-balance" data-testid="text-trip-title">{trip?.name ?? ""}</h1>
                 </div>
                 {trip && (() => {
                   const s = new Date(trip.startDate + "T00:00:00");
                   const e = new Date(trip.endDate + "T00:00:00");
                   const days = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                  return <p className="text-primary-foreground/90 text-xs font-medium truncate">{`${s.getDate()}.${s.getMonth() + 1} – ${e.getDate()}.${e.getMonth() + 1}.${e.getFullYear()} · ${days} ימים`}</p>;
+                  return <p className="text-primary-foreground/80 text-fluid-xs font-medium truncate tabular-nums">{`${s.getDate()}.${s.getMonth() + 1} – ${e.getDate()}.${e.getMonth() + 1}.${e.getFullYear()} · ${days} ימים`}</p>;
                 })()}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
@@ -193,7 +193,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
             )}
           </header>
 
-          <main className="flex-1 overflow-y-auto p-4 space-y-4 z-0">
+          <main className="flex-1 overflow-y-auto p-4 space-y-4 z-0 overscroll-contain" style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
             {!isOnline && (
               <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-amber-800" data-testid="offline-banner">
                 <CloudOff className="w-4 h-4 flex-shrink-0" />
@@ -233,8 +233,8 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
             )}
           </main>
 
-          <nav className="absolute bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-border rounded-t-3xl shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.12)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-            <div className="flex items-center px-1 py-1.5 gap-0.5">
+          <nav className="absolute bottom-0 left-0 w-full bg-white/98 backdrop-blur-md border-t border-border rounded-t-3xl shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.08)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+            <div className="flex items-center px-2 py-2 gap-0.5">
               <NavItem icon={<CalendarDays className="w-[18px] h-[18px]" />} label="מסלול" isActive={activeTab === "itinerary"} onClick={() => setActiveTab("itinerary")} />
               <NavItem icon={<Hotel className="w-[18px] h-[18px]" />} label="לינה" isActive={activeTab === "hotels"} onClick={() => setActiveTab("hotels")} />
               <NavItem icon={<Globe className="w-[18px] h-[18px]" />} label="מפה" isActive={activeTab === "map"} onClick={() => setActiveTab("map")} />
@@ -256,13 +256,15 @@ function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode; la
   return (
     <button
       onClick={onClick}
+      aria-label={label}
+      aria-current={isActive ? "page" : undefined}
       data-testid={`nav-${label}`}
-      className={`flex flex-col items-center gap-0.5 transition-all duration-200 ease-out flex-1 min-w-0 py-0.5 rounded-2xl ${isActive ? "text-primary" : "text-muted-foreground active:scale-95"}`}
+      className={`flex flex-col items-center gap-0.5 transition-all duration-200 ease-out flex-1 min-w-0 py-1.5 rounded-2xl ${isActive ? "text-primary" : "text-muted-foreground active:scale-95"}`}
     >
       <div className={`p-1.5 rounded-xl transition-all duration-200 ${isActive ? "bg-primary/12 text-primary shadow-sm" : "text-muted-foreground"}`}>
         {icon}
       </div>
-      <span className={`text-[9px] font-semibold leading-none truncate w-full text-center px-0.5 ${isActive ? "text-primary" : "opacity-60"}`}>{label}</span>
+      <span className={`text-[10px] font-semibold leading-none truncate w-full text-center px-0.5 ${isActive ? "text-primary" : "opacity-60"}`}>{label}</span>
     </button>
   );
 }
@@ -429,16 +431,16 @@ function DayCard({ day, tripId }: { day: Doc<"tripDays">; tripId: string }) {
 
   return (
     <>
-      <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white overflow-hidden" data-testid={`day-card-${day.dayNumber}`}>
+      <Card className="border-none shadow-[0_2px_12px_rgb(0,0,0,0.05)] rounded-2xl bg-white overflow-hidden" data-testid={`day-card-${day.dayNumber}`}>
         <div role="button" tabIndex={0} onClick={() => setExpanded(!expanded)} onKeyDown={(e) => e.key === "Enter" && setExpanded(!expanded)} className="w-full text-right cursor-pointer" data-testid={`button-expand-day-${day.dayNumber}`}>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold ${day.dayNumber === 0 || day.dayNumber === 10 ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
-              <span className="text-[10px] leading-none font-semibold">יום</span>
-              <span className="text-lg leading-none">{day.dayNumber}</span>
+            <div className={`size-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold ${day.dayNumber === 0 || day.dayNumber === 10 ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
+              <span className="text-fluid-2xs leading-none font-semibold">יום</span>
+              <span className="text-fluid-lg leading-none">{day.dayNumber}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] text-muted-foreground font-medium">{day.subtitle}</p>
-              <h3 className="font-bold text-sm text-foreground truncate">{day.title}</h3>
+              <p className="text-fluid-xs text-muted-foreground font-medium text-pretty">{day.subtitle}</p>
+              <h3 className="font-bold text-fluid-sm text-foreground truncate">{day.title}</h3>
               {day.rating && <RatingStars rating={day.rating} />}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
