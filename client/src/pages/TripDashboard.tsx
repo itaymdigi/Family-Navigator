@@ -4,13 +4,15 @@ import { useLocation } from "wouter";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Loader2, Plus, MapPin, Calendar, LogOut, Trash2, Users, Eye, EyeOff, ShieldCheck, UserRound } from "lucide-react";
+import { Loader2, Plus, MapPin, Calendar as CalendarIcon, LogOut, Trash2, Users, Eye, EyeOff, ShieldCheck, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function TripDashboard() {
   const [, navigate] = useLocation();
@@ -39,9 +41,60 @@ export default function TripDashboard() {
   });
   const [saving, setSaving] = useState(false);
 
+  const [showStartCal, setShowStartCal] = useState(false);
+  const [showEndCal, setShowEndCal] = useState(false);
+
   const isAdmin = (currentUser as any)?.role === "admin";
   const allUsers = useQuery(api.admin.listUsers, isAdmin ? {} : "skip");
   const { signOut } = useAuthActions();
+
+  // Date helpers
+  const parseDate = (s: string) => (s ? new Date(s + "T00:00:00") : undefined);
+  const toDateStr = (d: Date) => d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+  // Destination flag detection
+  const DEST_FLAGS: Array<[string[], string]> = [
+    [["ישראל", "israel", "tel aviv", "תל אביב", "jerusalem", "ירושלים"], "🇮🇱"],
+    [["czech", "צ'כיה", "צכיה", "prague", "פראג", "brno", "ברנו"], "🇨🇿"],
+    [["france", "צרפת", "paris", "פריז"], "🇫🇷"],
+    [["italy", "איטליה", "rome", "רומא", "milan", "מילאן", "venice", "ונציה"], "🇮🇹"],
+    [["spain", "ספרד", "barcelona", "ברצלונה", "madrid", "מדריד"], "🇪🇸"],
+    [["germany", "גרמניה", "berlin", "ברלין", "munich", "מינכן"], "🇩🇪"],
+    [["uk", "england", "britain", "אנגליה", "london", "לונדון", "scotland", "סקוטלנד"], "🇬🇧"],
+    [["usa", "america", 'ארה"ב', "new york", "ניו יורק", "los angeles", "florida"], "🇺🇸"],
+    [["greece", "יוון", "athens", "אתונה", "santorini", "סנטוריני"], "🇬🇷"],
+    [["turkey", "טורקיה", "istanbul", "איסטנבול", "antalya", "אנטליה"], "🇹🇷"],
+    [["portugal", "פורטוגל", "lisbon", "ליסבון", "porto", "פורטו"], "🇵🇹"],
+    [["netherlands", "holland", "הולנד", "amsterdam", "אמסטרדם"], "🇳🇱"],
+    [["austria", "אוסטריה", "vienna", "וינה"], "🇦🇹"],
+    [["switzerland", "שוויץ", "zurich", "ציריך", "bern", "ברן"], "🇨🇭"],
+    [["poland", "פולין", "warsaw", "ורשה", "krakow", "קרקוב"], "🇵🇱"],
+    [["hungary", "הונגריה", "budapest", "בודפשט"], "🇭🇺"],
+    [["croatia", "קרואטיה", "zagreb", "זגרב", "dubrovnik", "דוברובניק"], "🇭🇷"],
+    [["slovakia", "סלובקיה", "bratislava", "ברטיסלבה"], "🇸🇰"],
+    [["japan", "יפן", "tokyo", "טוקיו", "kyoto", "קיוטו"], "🇯🇵"],
+    [["thailand", "תאילנד", "bangkok", "בנגקוק"], "🇹🇭"],
+    [["jordan", "ירדן", "petra", "פטרה", "aqaba", "עקבה"], "🇯🇴"],
+    [["egypt", "מצרים", "cairo", "קהיר", "sharm", "שארם"], "🇪🇬"],
+    [["morocco", "מרוקו", "marrakech", "מרקש", "casablanca", "קזבלנקה"], "🇲🇦"],
+    [["dubai", "דובאי", "uae", "אמירויות", "abu dhabi"], "🇦🇪"],
+    [["canada", "קנדה", "toronto", "טורונטו", "vancouver", "ונקובר"], "🇨🇦"],
+    [["australia", "אוסטרליה", "sydney", "סידני", "melbourne", "מלבורן"], "🇦🇺"],
+    [["sweden", "שוודיה", "stockholm", "סטוקהולם"], "🇸🇪"],
+    [["norway", "נורווגיה", "oslo", "אוסלו"], "🇳🇴"],
+    [["denmark", "דנמרק", "copenhagen", "קופנהגן"], "🇩🇰"],
+    [["romania", "רומניה", "bucharest", "בוקרשט"], "🇷🇴"],
+    [["bulgaria", "בולגריה", "sofia", "סופיה"], "🇧🇬"],
+  ];
+  const getDestFlag = (dest: string) => {
+    if (!dest.trim()) return "";
+    const lower = dest.toLowerCase();
+    for (const [keys, flag] of DEST_FLAGS) {
+      if (keys.some((k) => lower.includes(k))) return flag;
+    }
+    return "";
+  };
+  const destFlag = getDestFlag(form.destination);
 
   const handleCreate = async () => {
     if (!form.name || !form.destination) return;
@@ -166,7 +219,7 @@ export default function TripDashboard() {
                   </div>
                   {(trip.startDate || trip.endDate) && (
                     <div className="flex items-center gap-1.5 text-white/70 text-xs">
-                      <Calendar className="w-3 h-3" />
+                      <CalendarIcon className="w-3 h-3" />
                       <span>
                         {trip.startDate && trip.endDate
                           ? `${trip.startDate} – ${trip.endDate}`
@@ -252,15 +305,21 @@ export default function TripDashboard() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>סיסמה</Label>
+              <div className="flex justify-between items-center">
+                <Label>סיסמה</Label>
+                {userForm.password.length > 0 && (
+                  <span className={`text-[11px] font-medium ${userForm.password.length >= 8 ? "text-green-600" : "text-red-500"}`}>
+                    {userForm.password.length}/8 תווים{userForm.password.length >= 8 ? " ✓" : ""}
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <Input
                   type={showUserPassword ? "text" : "password"}
                   placeholder="לפחות 8 תווים"
                   value={userForm.password}
                   onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                  className="pl-10"
-                  minLength={8}
+                  className={`pl-10 ${userForm.password.length > 0 && userForm.password.length < 8 ? "border-red-300 focus-visible:ring-red-400" : ""}`}
                 />
                 <button
                   type="button"
@@ -371,33 +430,71 @@ export default function TripDashboard() {
             </div>
             <div className="space-y-1.5">
               <Label>יעד</Label>
-              <Input
-                placeholder="לדוגמה: צפון צ'כיה"
-                value={form.destination}
-                onChange={(e) => setForm({ ...form, destination: e.target.value })}
-                data-testid="input-trip-destination"
-              />
+              <div className="relative">
+                <Input
+                  placeholder="לדוגמה: צפון צ'כיה"
+                  value={form.destination}
+                  onChange={(e) => setForm({ ...form, destination: e.target.value })}
+                  data-testid="input-trip-destination"
+                  className={destFlag ? "pl-10" : ""}
+                />
+                {destFlag && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xl pointer-events-none">
+                    {destFlag}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex gap-2">
               <div className="flex-1 space-y-1.5">
                 <Label>תאריך התחלה</Label>
-                <Input
-                  type="text"
-                  placeholder="25.3.2026"
-                  value={form.startDate}
-                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                  data-testid="input-trip-start"
-                />
+                <Popover open={showStartCal} onOpenChange={setShowStartCal}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between font-normal h-10 rounded-lg"
+                      data-testid="input-trip-start"
+                    >
+                      <span className={form.startDate ? "text-gray-900" : "text-gray-400"}>
+                        {form.startDate ? toDateStr(parseDate(form.startDate)!) : "בחר תאריך"}
+                      </span>
+                      <CalendarIcon className="w-4 h-4 text-gray-400" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={parseDate(form.startDate)}
+                      onSelect={(d) => { if (d) { setForm({ ...form, startDate: d.toISOString().split("T")[0] }); setShowStartCal(false); } }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="flex-1 space-y-1.5">
                 <Label>תאריך סיום</Label>
-                <Input
-                  type="text"
-                  placeholder="4.4.2026"
-                  value={form.endDate}
-                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                  data-testid="input-trip-end"
-                />
+                <Popover open={showEndCal} onOpenChange={setShowEndCal}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between font-normal h-10 rounded-lg"
+                      data-testid="input-trip-end"
+                    >
+                      <span className={form.endDate ? "text-gray-900" : "text-gray-400"}>
+                        {form.endDate ? toDateStr(parseDate(form.endDate)!) : "בחר תאריך"}
+                      </span>
+                      <CalendarIcon className="w-4 h-4 text-gray-400" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={parseDate(form.endDate)}
+                      onSelect={(d) => { if (d) { setForm({ ...form, endDate: d.toISOString().split("T")[0] }); setShowEndCal(false); } }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <div className="space-y-1.5">
