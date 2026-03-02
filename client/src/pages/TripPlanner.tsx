@@ -8,7 +8,8 @@ import {
   Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi,
   Filter, Maximize2, Lock, Unlock, FileText, FolderOpen, Globe,
   Plane, CreditCard, FileCheck, MoreVertical, UtensilsCrossed,
-  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, Home, Package, ListChecks, Backpack
+  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, Home, Package, ListChecks, Backpack,
+  Grid3X3
 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "../../../convex/_generated/api";
@@ -83,8 +85,24 @@ function useCountdown(targetDate: string, endDate?: string) {
   return timeLeft;
 }
 
+// All 9 tabs definition — single source of truth
+const ALL_TABS = [
+  { id: "itinerary",  label: "מסלול",   icon: <CalendarDays   className="w-5 h-5" /> },
+  { id: "hotels",     label: "לינה",    icon: <Hotel          className="w-5 h-5" /> },
+  { id: "map",        label: "מפה",     icon: <Globe          className="w-5 h-5" /> },
+  { id: "currency",   label: 'מט"ח',   icon: <Calculator     className="w-5 h-5" /> },
+  { id: "photos",     label: "תמונות",  icon: <ImageIcon      className="w-5 h-5" /> },
+  { id: "docs",       label: "מסמכים",  icon: <FolderOpen     className="w-5 h-5" /> },
+  { id: "food",       label: "אוכל",    icon: <UtensilsCrossed className="w-5 h-5" /> },
+  { id: "tips",       label: "טיפים",   icon: <Lightbulb      className="w-5 h-5" /> },
+  { id: "packing",    label: "הכנות",   icon: <Backpack       className="w-5 h-5" /> },
+];
+
+const PRIMARY_TAB_IDS = ["itinerary", "hotels", "food", "packing"];
+
 export default function TripPlanner({ tripId }: { tripId: string }) {
   const [activeTab, setActiveTab] = useState("itinerary");
+  const [showMenu, setShowMenu] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const isOnline = useOnlineStatus();
   const tripLive = useQuery(api.trips.get, { id: tripId as Id<"trips"> });
@@ -233,19 +251,83 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
             )}
           </main>
 
-          <nav className="absolute bottom-0 left-0 w-full bg-white/98 backdrop-blur-md border-t border-border rounded-t-3xl shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.08)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-            <div className="flex items-center px-2 py-2 gap-0.5">
-              <NavItem icon={<CalendarDays className="w-[18px] h-[18px]" />} label="מסלול" isActive={activeTab === "itinerary"} onClick={() => setActiveTab("itinerary")} />
-              <NavItem icon={<Hotel className="w-[18px] h-[18px]" />} label="לינה" isActive={activeTab === "hotels"} onClick={() => setActiveTab("hotels")} />
-              <NavItem icon={<Globe className="w-[18px] h-[18px]" />} label="מפה" isActive={activeTab === "map"} onClick={() => setActiveTab("map")} />
-              <NavItem icon={<Calculator className="w-[18px] h-[18px]" />} label="מט״ח" isActive={activeTab === "currency"} onClick={() => setActiveTab("currency")} />
-              <NavItem icon={<ImageIcon className="w-[18px] h-[18px]" />} label="תמונות" isActive={activeTab === "photos"} onClick={() => setActiveTab("photos")} />
-              <NavItem icon={<FolderOpen className="w-[18px] h-[18px]" />} label="מסמכים" isActive={activeTab === "docs"} onClick={() => setActiveTab("docs")} />
-              <NavItem icon={<UtensilsCrossed className="w-[18px] h-[18px]" />} label="אוכל" isActive={activeTab === "food"} onClick={() => setActiveTab("food")} />
-              <NavItem icon={<Lightbulb className="w-[18px] h-[18px]" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
-              <NavItem icon={<Backpack className="w-[18px] h-[18px]" />} label="הכנות" isActive={activeTab === "packing" || activeTab === "checklist"} onClick={() => setActiveTab(activeTab === "checklist" ? "checklist" : "packing")} />
+          {/* ── Bottom Nav (4 primary + menu) ──────────────────────────── */}
+          <nav
+            className="absolute bottom-0 left-0 w-full bg-white/98 backdrop-blur-md border-t border-border shadow-[0_-1px_0_0_hsl(var(--border))] z-20"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          >
+            <div className="flex items-stretch px-1 pt-1.5 pb-1">
+              {PRIMARY_TAB_IDS.map((id) => {
+                const tab = ALL_TABS.find((t) => t.id === id)!;
+                const isActive = activeTab === id || (id === "packing" && (activeTab === "packing" || activeTab === "checklist"));
+                return (
+                  <NavItem
+                    key={id}
+                    icon={tab.icon}
+                    label={tab.label}
+                    isActive={isActive}
+                    onClick={() => setActiveTab(id === "packing" && activeTab === "checklist" ? "checklist" : id)}
+                  />
+                );
+              })}
+              {/* More / hamburger button */}
+              <button
+                onClick={() => setShowMenu(true)}
+                aria-label="תפריט כל הסעיפים"
+                className={`flex flex-col items-center gap-0.5 flex-1 min-w-0 py-1 rounded-2xl transition-all duration-200 ${
+                  !PRIMARY_TAB_IDS.includes(activeTab) && activeTab !== "checklist"
+                    ? "text-primary"
+                    : "text-muted-foreground active:scale-95"
+                }`}
+              >
+                <div className={`p-1.5 rounded-xl transition-all duration-200 ${
+                  !PRIMARY_TAB_IDS.includes(activeTab) && activeTab !== "checklist"
+                    ? "bg-primary/12 text-primary shadow-sm"
+                    : ""
+                }`}>
+                  <Grid3X3 className="w-[20px] h-[20px]" />
+                </div>
+                <span className="text-[10px] font-semibold leading-none">עוד</span>
+              </button>
             </div>
           </nav>
+
+          {/* ── All sections drawer ─────────────────────────────────────── */}
+          <Sheet open={showMenu} onOpenChange={setShowMenu}>
+            <SheetContent side="bottom" className="rounded-t-[2rem] px-0 pb-0 border-0" dir="rtl">
+              {/* Drag handle */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-muted-foreground/25" />
+              </div>
+              <p className="text-center text-sm font-bold text-foreground pb-3 border-b border-border/50 mx-6">כל הסעיפים</p>
+              <div className="grid grid-cols-3 gap-3 px-5 py-4" style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}>
+                {ALL_TABS.map((tab) => {
+                  const isActive = activeTab === tab.id || (tab.id === "packing" && (activeTab === "packing" || activeTab === "checklist"));
+                  return (
+                    <button
+                      key={tab.id}
+                      aria-label={tab.label}
+                      aria-current={isActive ? "page" : undefined}
+                      onClick={() => {
+                        setActiveTab(tab.id === "packing" && activeTab === "checklist" ? "checklist" : tab.id);
+                        setShowMenu(false);
+                      }}
+                      className={`flex flex-col items-center gap-2.5 py-4 px-2 rounded-2xl transition-all active:scale-95 ${
+                        isActive
+                          ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20"
+                          : "bg-muted/60 text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <div className={`p-2.5 rounded-xl ${isActive ? "bg-primary/15" : "bg-background"}`}>
+                        {tab.icon}
+                      </div>
+                      <span className="text-fluid-xs font-semibold leading-none">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </AdminContext.Provider>

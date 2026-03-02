@@ -1,24 +1,32 @@
 {
-  "name": "טיול צפון צ'כיה",
-  "short_name": "צ'כיה 🇨🇿",
-  "description": "אפליקציית מלווה לטיול משפחתי בצפון צ'כיה",
+  "name": "Family Navigator",
+  "short_name": "Navigator",
+  "description": "אפליקציית ניווט משפחתית – מסלול, לינה, מסעדות, המרת מט״ח וגלריית תמונות",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#1B3D72",
   "theme_color": "#FF6B6B",
   "orientation": "portrait",
   "dir": "rtl",
   "lang": "he",
   "icons": [
     {
-      "src": "/favicon.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     },
     {
       "src": "/favicon.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
