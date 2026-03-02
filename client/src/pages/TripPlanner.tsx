@@ -8,7 +8,7 @@ import {
   Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi,
   Filter, Maximize2, Lock, Unlock, FileText, FolderOpen, Globe,
   Plane, CreditCard, FileCheck, MoreVertical, UtensilsCrossed,
-  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, ArrowRight
+  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, Home
 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -147,10 +147,11 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
                 )}
                 <button
                   onClick={() => navigate("/")}
-                  className="p-2 rounded-full bg-white/15 text-white/70 hover:bg-white/25 transition-all"
-                  title="חזור לרשימת הטיולים"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/15 text-white/80 hover:bg-white/25 transition-all"
+                  title="כל הטיולים"
                 >
-                  <ArrowRight className="w-4 h-4" />
+                  <Home className="w-3.5 h-3.5" />
+                  <span className="text-[10px] font-medium">בית</span>
                 </button>
                 <button
                   onClick={handleLogout}

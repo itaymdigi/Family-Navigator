@@ -9,6 +9,7 @@
  */
 
 import type * as accommodations from "../accommodations.js";
+import type * as admin from "../admin.js";
 import type * as attractions from "../attractions.js";
 import type * as auth from "../auth.js";
 import type * as conversations from "../conversations.js";
@@ -37,6 +38,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   accommodations: typeof accommodations;
+  admin: typeof admin;
   attractions: typeof attractions;
   auth: typeof auth;
   conversations: typeof conversations;
