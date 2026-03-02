@@ -8,7 +8,7 @@ import {
   Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi,
   Filter, Maximize2, Lock, Unlock, FileText, FolderOpen, Globe,
   Plane, CreditCard, FileCheck, MoreVertical, UtensilsCrossed,
-  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, Home, Package, ListChecks
+  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, Home, Package, ListChecks, Backpack
 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -111,34 +111,34 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
       <div className="h-dvh bg-muted/50 flex justify-center selection:bg-primary/20 overflow-hidden" dir="rtl">
         <div className="w-full max-w-md bg-background shadow-2xl h-dvh relative flex flex-col overflow-hidden sm:border-x sm:border-border" style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}>
           <header className="pb-6 px-6 bg-gradient-to-br from-primary via-primary to-[hsl(var(--primary)/0.85)] text-primary-foreground rounded-b-[2rem] shadow-lg z-10 relative" style={{ paddingTop: "calc(2.5rem + env(safe-area-inset-top))" }}>
-            <div className="flex justify-between items-center mb-6">
-              <div>
+            <div className="flex justify-between items-center gap-2 mb-6">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-2xl">{trip?.coverEmoji ?? "✈️"}</span>
-                  <h1 className="text-xl font-bold tracking-tight" data-testid="text-trip-title">{trip?.name ?? ""}</h1>
+                  <span className="text-2xl flex-shrink-0">{trip?.coverEmoji ?? "✈️"}</span>
+                  <h1 className="text-xl font-bold tracking-tight truncate" data-testid="text-trip-title">{trip?.name ?? ""}</h1>
                 </div>
                 {trip && (() => {
                   const s = new Date(trip.startDate + "T00:00:00");
                   const e = new Date(trip.endDate + "T00:00:00");
                   const days = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                  return <p className="text-primary-foreground/90 text-sm font-medium">{`${s.getDate()}.${s.getMonth() + 1} – ${e.getDate()}.${e.getMonth() + 1}.${e.getFullYear()} · ${days} ימים`}</p>;
+                  return <p className="text-primary-foreground/90 text-xs font-medium truncate">{`${s.getDate()}.${s.getMonth() + 1} – ${e.getDate()}.${e.getMonth() + 1}.${e.getFullYear()} · ${days} ימים`}</p>;
                 })()}
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 flex-shrink-0">
                 {!isOnline && (
-                  <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-2.5 py-1.5 rounded-full" data-testid="offline-indicator">
+                  <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full" data-testid="offline-indicator">
                     <CloudOff className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-semibold">אופליין</span>
+                    <span className="text-[10px] font-semibold hidden sm:inline">אופליין</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1 bg-white/15 backdrop-blur-sm px-2 py-1 rounded-full">
                   <User className="w-3 h-3" />
-                  <span className="text-[10px] font-medium" data-testid="text-username">{user?.name ?? ""}</span>
+                  <span className="text-[10px] font-medium hidden sm:inline" data-testid="text-username">{user?.name ?? ""}</span>
                 </div>
                 {user?.role === "admin" && (
                   <button
                     onClick={toggleAdmin}
-                    className={`p-2 rounded-full transition-all ${isAdmin ? "bg-green-500/30 text-white" : "bg-white/15 text-white/70 hover:bg-white/25"}`}
+                    className={`p-1.5 rounded-full transition-all ${isAdmin ? "bg-green-500/30 text-white" : "bg-white/15 text-white/70 hover:bg-white/25"}`}
                     data-testid="button-toggle-admin"
                     title={isAdmin ? "מצב עריכה פעיל" : "כניסה למצב עריכה"}
                   >
@@ -147,15 +147,15 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
                 )}
                 <button
                   onClick={() => navigate("/")}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/15 text-white/80 hover:bg-white/25 transition-all"
+                  className="p-1.5 rounded-full bg-white/15 text-white/80 hover:bg-white/25 transition-all"
+                  data-testid="button-home"
                   title="כל הטיולים"
                 >
-                  <Home className="w-3.5 h-3.5" />
-                  <span className="text-[10px] font-medium">בית</span>
+                  <Home className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="p-2 rounded-full bg-white/15 text-white/70 hover:bg-red-500/30 hover:text-white transition-all"
+                  className="p-1.5 rounded-full bg-white/15 text-white/70 hover:bg-red-500/30 hover:text-white transition-all"
                   data-testid="button-logout"
                   title="התנתק"
                 >
@@ -211,8 +211,26 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
             {activeTab === "docs" && <DocsView tripId={tripId} />}
             {activeTab === "food" && <RestaurantsView tripId={tripId} />}
             {activeTab === "tips" && <TipsView tripId={tripId} />}
-            {activeTab === "packing" && <PackingView tripId={tripId} />}
-            {activeTab === "checklist" && <ChecklistView tripId={tripId} />}
+            {(activeTab === "packing" || activeTab === "checklist") && (
+              <>
+                <div className="flex gap-2 sticky top-0 z-10 bg-muted/50 -mx-4 px-4 py-2 -mt-4 mb-0 backdrop-blur-sm border-b border-border/30">
+                  <button
+                    onClick={() => setActiveTab("packing")}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === "packing" ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <Package className="w-4 h-4" /> ציוד
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("checklist")}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === "checklist" ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <ListChecks className="w-4 h-4" /> משימות
+                  </button>
+                </div>
+                {activeTab === "packing" && <PackingView tripId={tripId} />}
+                {activeTab === "checklist" && <ChecklistView tripId={tripId} />}
+              </>
+            )}
           </main>
 
           <nav className="absolute bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-border rounded-t-3xl shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.12)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
@@ -225,8 +243,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
               <NavItem icon={<FolderOpen className="w-[18px] h-[18px]" />} label="מסמכים" isActive={activeTab === "docs"} onClick={() => setActiveTab("docs")} />
               <NavItem icon={<UtensilsCrossed className="w-[18px] h-[18px]" />} label="אוכל" isActive={activeTab === "food"} onClick={() => setActiveTab("food")} />
               <NavItem icon={<Lightbulb className="w-[18px] h-[18px]" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
-              <NavItem icon={<Package className="w-[18px] h-[18px]" />} label="ציוד" isActive={activeTab === "packing"} onClick={() => setActiveTab("packing")} />
-              <NavItem icon={<ListChecks className="w-[18px] h-[18px]" />} label="משימות" isActive={activeTab === "checklist"} onClick={() => setActiveTab("checklist")} />
+              <NavItem icon={<Backpack className="w-[18px] h-[18px]" />} label="הכנות" isActive={activeTab === "packing" || activeTab === "checklist"} onClick={() => setActiveTab(activeTab === "checklist" ? "checklist" : "packing")} />
             </div>
           </nav>
         </div>

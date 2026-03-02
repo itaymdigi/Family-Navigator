@@ -187,56 +187,79 @@ export default function TripDashboard() {
               <p className="text-sm mt-2">לחצו על "טיול חדש" כדי להתחיל</p>
             )}
           </div>
-        ) : (
-          <div className="space-y-4">
-            {trips.map((trip) => (
-              <div
-                key={trip._id}
-                onClick={() => navigate(`/trips/${trip._id}`)}
-                className="w-full text-right bg-white rounded-2xl shadow-md hover:shadow-lg transition-all hover:scale-[1.01] overflow-hidden cursor-pointer"
-                data-testid={`trip-card-${trip._id}`}
-              >
-                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 px-6 py-5 text-white relative">
-                  {isAdmin && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setTripToDelete(trip._id); }}
-                      className="absolute top-3 left-3 p-1.5 rounded-lg bg-white/15 hover:bg-red-500/70 transition-colors"
-                      title="מחק טיול"
-                      data-testid={`button-delete-trip-${trip._id}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-3xl">{trip.coverEmoji || "✈️"}</span>
-                    <div>
-                      <h2 className="text-lg font-bold">{trip.name}</h2>
-                      <div className="flex items-center gap-1.5 text-white/80 text-xs mt-0.5">
-                        <MapPin className="w-3 h-3" />
-                        <span>{trip.destination}</span>
-                      </div>
+        ) : (() => {
+          const today = new Date().toISOString().split("T")[0];
+          const active = trips.filter((t) => t.startDate <= today && t.endDate >= today);
+          const upcoming = trips.filter((t) => t.startDate > today);
+          const past = trips.filter((t) => t.endDate < today);
+
+          const TripCard = ({ trip, dim }: { trip: typeof trips[0]; dim?: boolean }) => (
+            <div
+              key={trip._id}
+              onClick={() => navigate(`/trips/${trip._id}`)}
+              className={`w-full text-right bg-white rounded-2xl shadow-md hover:shadow-lg transition-all hover:scale-[1.01] overflow-hidden cursor-pointer ${dim ? "opacity-50 grayscale" : ""}`}
+              data-testid={`trip-card-${trip._id}`}
+            >
+              <div className="bg-gradient-to-br from-blue-500 to-indigo-600 px-6 py-5 text-white relative">
+                {isAdmin && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setTripToDelete(trip._id); }}
+                    className="absolute top-3 left-3 p-1.5 rounded-lg bg-white/15 hover:bg-red-500/70 transition-colors"
+                    title="מחק טיול"
+                    data-testid={`button-delete-trip-${trip._id}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-3xl">{trip.coverEmoji || "✈️"}</span>
+                  <div>
+                    <h2 className="text-lg font-bold">{trip.name}</h2>
+                    <div className="flex items-center gap-1.5 text-white/80 text-xs mt-0.5">
+                      <MapPin className="w-3 h-3" />
+                      <span>{trip.destination}</span>
                     </div>
                   </div>
-                  {(trip.startDate || trip.endDate) && (
-                    <div className="flex items-center gap-1.5 text-white/70 text-xs">
-                      <CalendarIcon className="w-3 h-3" />
-                      <span>
-                        {trip.startDate && trip.endDate
-                          ? `${trip.startDate} – ${trip.endDate}`
-                          : trip.startDate || trip.endDate}
-                      </span>
-                    </div>
-                  )}
                 </div>
-                {trip.description && (
-                  <div className="px-6 py-3">
-                    <p className="text-sm text-gray-600 text-right">{trip.description}</p>
+                {(trip.startDate || trip.endDate) && (
+                  <div className="flex items-center gap-1.5 text-white/70 text-xs">
+                    <CalendarIcon className="w-3 h-3" />
+                    <span>
+                      {trip.startDate && trip.endDate
+                        ? `${trip.startDate} – ${trip.endDate}`
+                        : trip.startDate || trip.endDate}
+                    </span>
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-        )}
+              {trip.description && (
+                <div className="px-6 py-3">
+                  <p className="text-sm text-gray-600 text-right">{trip.description}</p>
+                </div>
+              )}
+            </div>
+          );
+
+          const Section = ({ label, badge, badgeColor, items, dim }: { label: string; badge: string; badgeColor: string; items: typeof trips; dim?: boolean }) =>
+            items.length === 0 ? null : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${badgeColor}`}>{badge}</span>
+                  <span className="text-sm font-semibold text-gray-500">{label}</span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+                {items.map((trip) => <TripCard key={trip._id} trip={trip} dim={dim} />)}
+              </div>
+            );
+
+          return (
+            <div className="space-y-6">
+              <Section label="מתרחש עכשיו" badge="פעיל" badgeColor="bg-green-100 text-green-700" items={active} />
+              <Section label="קרוב" badge="עתידי" badgeColor="bg-blue-100 text-blue-700" items={upcoming} />
+              <Section label="הסתיים" badge="עבר" badgeColor="bg-gray-100 text-gray-500" items={past} dim />
+            </div>
+          );
+        })()}
       </div>
 
       {/* User Management Dialog */}
