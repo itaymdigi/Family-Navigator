@@ -165,6 +165,16 @@ export default defineSchema({
     sortOrder: v.number(),
   }).index("by_trip", ["tripId"]),
 
+  // Packing list items
+  packingItems: defineTable({
+    tripId: v.id("trips"),
+    name: v.string(),
+    category: v.string(),
+    isPacked: v.boolean(),
+    assignedTo: v.optional(v.string()),
+    quantity: v.optional(v.number()),
+  }).index("by_trip", ["tripId"]),
+
   // AI conversations
   conversations: defineTable({
     tripId: v.id("trips"),

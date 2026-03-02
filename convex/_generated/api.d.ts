@@ -20,6 +20,7 @@ import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as mapLocations from "../mapLocations.js";
 import type * as messages from "../messages.js";
+import type * as packingItems from "../packingItems.js";
 import type * as photos from "../photos.js";
 import type * as restaurants from "../restaurants.js";
 import type * as seed from "../seed.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   mapLocations: typeof mapLocations;
   messages: typeof messages;
+  packingItems: typeof packingItems;
   photos: typeof photos;
   restaurants: typeof restaurants;
   seed: typeof seed;

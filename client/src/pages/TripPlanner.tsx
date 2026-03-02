@@ -8,7 +8,7 @@ import {
   Plus, Pencil, Map, X, Check, Upload, Link, CloudOff, Wifi,
   Filter, Maximize2, Lock, Unlock, FileText, FolderOpen, Globe,
   Plane, CreditCard, FileCheck, MoreVertical, UtensilsCrossed,
-  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, Home
+  MapPinned, ThumbsUp, ThumbsDown, LogOut, User, Home, Package
 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -211,6 +211,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
             {activeTab === "docs" && <DocsView tripId={tripId} />}
             {activeTab === "food" && <RestaurantsView tripId={tripId} />}
             {activeTab === "tips" && <TipsView tripId={tripId} />}
+            {activeTab === "packing" && <PackingView tripId={tripId} />}
           </main>
 
           <nav className="absolute bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-border rounded-t-3xl shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.12)] z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
@@ -223,6 +224,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
               <NavItem icon={<FolderOpen className="w-[18px] h-[18px]" />} label="מסמכים" isActive={activeTab === "docs"} onClick={() => setActiveTab("docs")} />
               <NavItem icon={<UtensilsCrossed className="w-[18px] h-[18px]" />} label="אוכל" isActive={activeTab === "food"} onClick={() => setActiveTab("food")} />
               <NavItem icon={<Lightbulb className="w-[18px] h-[18px]" />} label="טיפים" isActive={activeTab === "tips"} onClick={() => setActiveTab("tips")} />
+              <NavItem icon={<Package className="w-[18px] h-[18px]" />} label="ציוד" isActive={activeTab === "packing"} onClick={() => setActiveTab("packing")} />
             </div>
           </nav>
         </div>
@@ -1971,6 +1973,196 @@ function AddTipForm({ tripId }: { tripId: string }) {
             {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : "שמור"}
           </Button>
           <Button size="sm" variant="ghost" className="h-8 text-xs rounded-lg" onClick={() => setOpen(false)}>ביטול</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Packing List ────────────────────────────────────────────────────────────
+
+const PACKING_CATEGORIES: { id: string; label: string; icon: string; color: string; bg: string }[] = [
+  { id: "clothing",    label: "ביגוד",       icon: "👕", color: "text-blue-700",   bg: "bg-blue-50" },
+  { id: "documents",  label: "מסמכים",      icon: "📄", color: "text-purple-700", bg: "bg-purple-50" },
+  { id: "toiletries", label: "טואלטיקה",    icon: "🧴", color: "text-pink-700",   bg: "bg-pink-50" },
+  { id: "electronics",label: "אלקטרוניקה",  icon: "🔌", color: "text-orange-700", bg: "bg-orange-50" },
+  { id: "kids",       label: "ילדים",       icon: "🧸", color: "text-green-700",  bg: "bg-green-50" },
+  { id: "other",      label: "שונות",       icon: "📦", color: "text-gray-700",   bg: "bg-gray-50" },
+];
+
+function PackingView({ tripId }: { tripId: string }) {
+  const { isAdmin } = useAdmin();
+  const items = useQuery(api.packingItems.list, { tripId: tripId as Id<"trips"> });
+  const togglePacked = useMutation(api.packingItems.togglePacked);
+  const removeItem = useMutation(api.packingItems.remove);
+  const [showAdd, setShowAdd] = useState(false);
+
+  if (items === undefined) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+
+  const total = items.length;
+  const packed = items.filter((i) => i.isPacked).length;
+  const pct = total === 0 ? 0 : Math.round((packed / total) * 100);
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-lg font-bold text-foreground tracking-tight">🎒 רשימת ציוד</h2>
+        <span className="text-sm font-medium text-muted-foreground">{packed}/{total} ארוזו</span>
+      </div>
+
+      {/* Overall progress */}
+      {total > 0 && (
+        <div className="space-y-1.5">
+          <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${pct}%`, background: pct === 100 ? "#22c55e" : "linear-gradient(90deg,#6366f1,#8b5cf6)" }}
+            />
+          </div>
+          {pct === 100 && <p className="text-xs text-green-600 font-medium text-center">✅ הכל ארוז! אפשר לטוס 🎉</p>}
+        </div>
+      )}
+
+      {/* Categories */}
+      {PACKING_CATEGORIES.map((cat) => {
+        const catItems = items.filter((i) => i.category === cat.id);
+        if (catItems.length === 0) return null;
+        const catPacked = catItems.filter((i) => i.isPacked).length;
+        return (
+          <Card key={cat.id} className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cat.bg} ${cat.color}`}>
+                    {cat.icon} {cat.label}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">{catPacked}/{catItems.length}</span>
+              </div>
+              <div className="space-y-1">
+                {catItems.map((item) => (
+                  <div key={item._id} className="flex items-center gap-2.5 py-1 group">
+                    <button
+                      onClick={() => togglePacked({ id: item._id, isPacked: !item.isPacked })}
+                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                        item.isPacked
+                          ? "bg-green-500 border-green-500 text-white"
+                          : "border-gray-300 hover:border-primary"
+                      }`}
+                    >
+                      {item.isPacked && <Check className="w-3 h-3" />}
+                    </button>
+                    <span className={`text-sm flex-1 transition-all ${item.isPacked ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                      {item.name}
+                      {item.quantity && item.quantity > 1 && (
+                        <span className="text-xs text-muted-foreground mr-1">×{item.quantity}</span>
+                      )}
+                    </span>
+                    {item.assignedTo && (
+                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{item.assignedTo}</span>
+                    )}
+                    {isAdmin && (
+                      <button
+                        onClick={() => removeItem({ id: item._id })}
+                        className="opacity-0 group-hover:opacity-60 text-red-400 hover:text-red-600 transition-opacity p-0.5 flex-shrink-0"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      {items.length === 0 && !showAdd && (
+        <div className="text-center py-12 text-muted-foreground text-sm">עדיין אין פריטים ברשימה</div>
+      )}
+
+      {/* Add form */}
+      {isAdmin && (
+        showAdd
+          ? <AddPackingItemForm tripId={tripId} onDone={() => setShowAdd(false)} />
+          : <button onClick={() => setShowAdd(true)} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 py-1 px-1">
+              <Plus className="w-3 h-3" /> הוסף פריט
+            </button>
+      )}
+    </div>
+  );
+}
+
+function AddPackingItemForm({ tripId, onDone }: { tripId: string; onDone: () => void }) {
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("clothing");
+  const [assignedTo, setAssignedTo] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [saving, setSaving] = useState(false);
+  const addItem = useMutation(api.packingItems.create);
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      await addItem({
+        tripId: tripId as Id<"trips">,
+        name: name.trim(),
+        category,
+        assignedTo: assignedTo.trim() || undefined,
+        quantity: Number(quantity) > 1 ? Number(quantity) : undefined,
+      });
+      setName(""); setAssignedTo(""); setQuantity("1");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="border-none shadow-[0_4px_20px_rgb(0,0,0,0.04)] rounded-2xl bg-white">
+      <CardContent className="p-4 space-y-3">
+        <p className="text-xs font-semibold text-muted-foreground">פריט חדש</p>
+        <div className="flex gap-2">
+          <Input
+            placeholder="שם הפריט..."
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSave()}
+            className="flex-1 h-9 text-sm"
+            autoFocus
+          />
+          <Input
+            placeholder="כמות"
+            type="number"
+            min={1}
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className="w-16 h-9 text-sm text-center"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="flex-1 h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PACKING_CATEGORIES.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.icon} {c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            placeholder="עבור מי?"
+            value={assignedTo}
+            onChange={(e) => setAssignedTo(e.target.value)}
+            className="flex-1 h-9 text-sm"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" className="h-8 text-xs rounded-lg bg-primary" onClick={handleSave} disabled={!name.trim() || saving}>
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : "הוסף"}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 text-xs rounded-lg" onClick={onDone}>ביטול</Button>
         </div>
       </CardContent>
     </Card>
