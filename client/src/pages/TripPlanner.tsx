@@ -9,7 +9,7 @@ import {
   Filter, Maximize2, Lock, Unlock, FileText, FolderOpen, Globe,
   Plane, CreditCard, FileCheck, MoreVertical, UtensilsCrossed,
   MapPinned, ThumbsUp, ThumbsDown, LogOut, User, Home, Package, ListChecks, Backpack,
-  Grid3X3
+  Grid3X3, Search, Copy, UserCircle2, ChevronLeft as ChevronLt
 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -103,6 +103,7 @@ const PRIMARY_TAB_IDS = ["itinerary", "hotels", "food", "packing"];
 export default function TripPlanner({ tripId }: { tripId: string }) {
   const [activeTab, setActiveTab] = useState("itinerary");
   const [showMenu, setShowMenu] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const isOnline = useOnlineStatus();
   const tripLive = useQuery(api.trips.get, { id: tripId as Id<"trips"> });
@@ -111,6 +112,9 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
   const currentUser = useQuery(api.users.me);
   const { signOut } = useAuthActions();
   const [, navigate] = useLocation();
+  // Stats for header pills
+  const allChecklist = useQuery(api.checklistItems.list, { tripId: tripId as Id<"trips"> });
+  const allPacking = useQuery(api.packingItems.list, { tripId: tripId as Id<"trips"> });
 
   const user = currentUser as (Doc<"users"> & { role?: string }) | null | undefined;
 
@@ -164,6 +168,15 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
                   </button>
                 )}
                 <button
+                  onClick={() => setShowSearch(true)}
+                  className="p-1.5 rounded-full bg-white/15 text-white/80 hover:bg-white/25 transition-all"
+                  data-testid="button-search"
+                  aria-label="חיפוש בטיול"
+                  title="חיפוש"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+                <button
                   onClick={() => navigate("/")}
                   className="p-1.5 rounded-full bg-white/15 text-white/80 hover:bg-white/25 transition-all"
                   data-testid="button-home"
@@ -202,6 +215,39 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+            {/* Stats pills */}
+            {(allChecklist !== undefined || allPacking !== undefined) && (
+              <div className="mt-2 flex gap-2 justify-center">
+                {allChecklist !== undefined && allChecklist.length > 0 && (() => {
+                  const done = allChecklist.filter((c) => c.isDone).length;
+                  const total = allChecklist.length;
+                  return (
+                    <button
+                      onClick={() => { setActiveTab("checklist"); }}
+                      className="flex items-center gap-1 bg-white/15 backdrop-blur-sm px-2.5 py-1 rounded-full hover:bg-white/25 transition-all"
+                    >
+                      <ListChecks className="w-3 h-3 opacity-80" />
+                      <span className="text-[10px] font-bold tabular-nums">{done}/{total}</span>
+                      <span className="text-[9px] opacity-70">משימות</span>
+                    </button>
+                  );
+                })()}
+                {allPacking !== undefined && allPacking.length > 0 && (() => {
+                  const packed = allPacking.filter((p) => p.isPacked).length;
+                  const total = allPacking.length;
+                  return (
+                    <button
+                      onClick={() => { setActiveTab("packing"); }}
+                      className="flex items-center gap-1 bg-white/15 backdrop-blur-sm px-2.5 py-1 rounded-full hover:bg-white/25 transition-all"
+                    >
+                      <Package className="w-3 h-3 opacity-80" />
+                      <span className="text-[10px] font-bold tabular-nums">{packed}/{total}</span>
+                      <span className="text-[9px] opacity-70">ציוד</span>
+                    </button>
+                  );
+                })()}
               </div>
             )}
             {isAdmin && (
@@ -328,9 +374,146 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
               </div>
             </SheetContent>
           </Sheet>
+
+          {/* ── Search modal ──────────────────────────────────────────── */}
+          {showSearch && (
+            <SearchModal tripId={tripId} onClose={() => setShowSearch(false)} onNavigate={(tab) => { setActiveTab(tab); setShowSearch(false); }} />
+          )}
         </div>
       </div>
     </AdminContext.Provider>
+  );
+}
+
+// ─── Search Modal ──────────────────────────────────────────────────────────────
+function SearchModal({ tripId, onClose, onNavigate }: { tripId: string; onClose: () => void; onNavigate: (tab: string) => void }) {
+  const [q, setQ] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(q), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const results = useQuery(
+    api.search.tripSearch,
+    debounced.length >= 2 ? { tripId: tripId as Id<"trips">, q: debounced } : "skip"
+  );
+
+  const hasResults = results && (
+    results.days.length + results.attractions.length + results.restaurants.length + results.hotels.length + results.tips.length > 0
+  );
+
+  return (
+    <div className="absolute inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col" dir="rtl">
+      {/* Search bar */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border" style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
+        <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        <input
+          ref={inputRef}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="חפש בטיול..."
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        />
+        {q && (
+          <button onClick={() => setQ("")} className="p-0.5 rounded-full text-muted-foreground hover:text-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+        <button onClick={onClose} className="text-sm font-medium text-primary ml-2">ביטול</button>
+      </div>
+
+      {/* Results */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {debounced.length >= 2 && !results && (
+          <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        )}
+        {debounced.length >= 2 && results && !hasResults && (
+          <p className="text-center text-muted-foreground text-sm py-10">לא נמצאו תוצאות עבור "{debounced}"</p>
+        )}
+        {debounced.length < 2 && (
+          <p className="text-center text-muted-foreground text-sm py-10">הקלד לפחות 2 תווים לחיפוש</p>
+        )}
+
+        {results?.days && results.days.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide px-1">ימים</p>
+            {results.days.map((d) => (
+              <button key={d._id} onClick={() => onNavigate("itinerary")} className="w-full flex items-center gap-3 bg-muted/40 rounded-xl px-3 py-2.5 text-right hover:bg-muted transition-colors">
+                <CalendarDays className="w-4 h-4 text-primary flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">יום {d.dayNumber} — {d.title}</p>
+                  <p className="text-xs text-muted-foreground">{d.date}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {results?.attractions && results.attractions.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide px-1">אטרקציות</p>
+            {results.attractions.map((a) => (
+              <button key={a._id} onClick={() => onNavigate("itinerary")} className="w-full flex items-center gap-3 bg-muted/40 rounded-xl px-3 py-2.5 text-right hover:bg-muted transition-colors">
+                <MapPin className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{a.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">יום {a.dayNumber} — {a.dayTitle}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {results?.restaurants && results.restaurants.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide px-1">מסעדות</p>
+            {results.restaurants.map((r) => (
+              <button key={r._id} onClick={() => onNavigate("food")} className="w-full flex items-center gap-3 bg-muted/40 rounded-xl px-3 py-2.5 text-right hover:bg-muted transition-colors">
+                <UtensilsCrossed className="w-4 h-4 text-rose-500 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{r.name}</p>
+                  {r.cuisine && <p className="text-xs text-muted-foreground">{r.cuisine}</p>}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {results?.hotels && results.hotels.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide px-1">לינה</p>
+            {results.hotels.map((h) => (
+              <button key={h._id} onClick={() => onNavigate("hotels")} className="w-full flex items-center gap-3 bg-muted/40 rounded-xl px-3 py-2.5 text-right hover:bg-muted transition-colors">
+                <Hotel className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{h.name}</p>
+                  <p className="text-xs text-muted-foreground">{h.dates}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {results?.tips && results.tips.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide px-1">טיפים</p>
+            {results.tips.map((t) => (
+              <button key={t._id} onClick={() => onNavigate("tips")} className="w-full flex items-center gap-3 bg-muted/40 rounded-xl px-3 py-2.5 text-right hover:bg-muted transition-colors">
+                <Lightbulb className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                <p className="text-sm text-foreground text-right line-clamp-2">{t.text}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -2096,22 +2279,53 @@ const PACKING_CATEGORIES: { id: string; label: string; icon: string; color: stri
 function PackingView({ tripId }: { tripId: string }) {
   const { isAdmin } = useAdmin();
   const items = useQuery(api.packingItems.list, { tripId: tripId as Id<"trips"> });
+  const members = useQuery(api.familyMembers.list, { tripId: tripId as Id<"trips"> });
   const togglePacked = useMutation(api.packingItems.togglePacked);
+  const assignItem = useMutation(api.packingItems.assign);
   const removeItem = useMutation(api.packingItems.remove);
   const [showAdd, setShowAdd] = useState(false);
+  const [filterMember, setFilterMember] = useState<string | null>(null);
 
   if (items === undefined) return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
 
-  const total = items.length;
-  const packed = items.filter((i) => i.isPacked).length;
+  const filteredItems = filterMember ? items.filter((i) => i.assignedTo === filterMember) : items;
+  const total = filteredItems.length;
+  const packed = filteredItems.filter((i) => i.isPacked).length;
   const pct = total === 0 ? 0 : Math.round((packed / total) * 100);
+
+  // Build member color map for chips
+  const memberColorObj: Record<string, string> = {};
+  for (const m of members ?? []) memberColorObj[m.name] = m.color;
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both pb-4">
       <div className="flex items-center justify-between px-1">
         <h2 className="text-lg font-bold text-foreground tracking-tight">🎒 רשימת ציוד</h2>
-        <span className="text-sm font-medium text-muted-foreground">{packed}/{total} ארוזו</span>
+        <span className="text-sm font-medium text-muted-foreground tabular-nums">{packed}/{total} ארוזו</span>
       </div>
+
+      {/* Family member filter chips */}
+      {members && members.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setFilterMember(null)}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${filterMember === null ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+          >
+            הכל
+          </button>
+          {members.map((m) => (
+            <button
+              key={m._id}
+              onClick={() => setFilterMember(filterMember === m.name ? null : m.name)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${filterMember === m.name ? "shadow-sm ring-2 ring-offset-1" : "opacity-70 hover:opacity-100"}`}
+              style={{ backgroundColor: m.color + (filterMember === m.name ? "33" : "20"), color: m.color, outline: filterMember === m.name ? `2px solid ${m.color}` : "none", outlineOffset: "1px" }}
+            >
+              {m.avatar && <span>{m.avatar}</span>}
+              {m.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Overall progress */}
       {total > 0 && (
@@ -2128,7 +2342,7 @@ function PackingView({ tripId }: { tripId: string }) {
 
       {/* Categories */}
       {PACKING_CATEGORIES.map((cat) => {
-        const catItems = items.filter((i) => i.category === cat.id);
+        const catItems = filteredItems.filter((i) => i.category === cat.id);
         if (catItems.length === 0) return null;
         const catPacked = catItems.filter((i) => i.isPacked).length;
         return (
@@ -2140,7 +2354,7 @@ function PackingView({ tripId }: { tripId: string }) {
                     {cat.icon} {cat.label}
                   </span>
                 </div>
-                <span className="text-xs text-muted-foreground">{catPacked}/{catItems.length}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{catPacked}/{catItems.length}</span>
               </div>
               <div className="space-y-1">
                 {catItems.map((item) => (
@@ -2161,13 +2375,38 @@ function PackingView({ tripId }: { tripId: string }) {
                         <span className="text-xs text-muted-foreground mr-1">×{item.quantity}</span>
                       )}
                     </span>
-                    {item.assignedTo && (
-                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{item.assignedTo}</span>
+                    {/* Assignment chip */}
+                    {item.assignedTo && (() => {
+                      const color = memberColorObj[item.assignedTo];
+                      return (
+                        <span
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                          style={color ? { backgroundColor: color + "25", color } : { backgroundColor: "var(--muted)", color: "var(--muted-foreground)" }}
+                        >
+                          {item.assignedTo}
+                        </span>
+                      );
+                    })()}
+                    {/* Admin: assign dropdown */}
+                    {isAdmin && members && members.length > 0 && (
+                      <select
+                        value={item.assignedTo ?? ""}
+                        onChange={(e) => assignItem({ id: item._id, assignedTo: e.target.value || undefined })}
+                        className="text-[10px] bg-transparent border-none outline-none text-muted-foreground cursor-pointer opacity-0 group-hover:opacity-100 w-5 transition-opacity"
+                        aria-label="שייך פריט לחבר משפחה"
+                        title="שייך לחבר משפחה"
+                      >
+                        <option value="">—</option>
+                        {members.map((m) => (
+                          <option key={m._id} value={m.name}>{m.name}</option>
+                        ))}
+                      </select>
                     )}
                     {isAdmin && (
                       <button
                         onClick={() => removeItem({ id: item._id })}
                         className="opacity-0 group-hover:opacity-60 text-red-400 hover:text-red-600 transition-opacity p-0.5 flex-shrink-0"
+                        aria-label="מחק פריט"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -2180,14 +2419,16 @@ function PackingView({ tripId }: { tripId: string }) {
         );
       })}
 
-      {items.length === 0 && !showAdd && (
-        <div className="text-center py-12 text-muted-foreground text-sm">עדיין אין פריטים ברשימה</div>
+      {filteredItems.length === 0 && !showAdd && (
+        <div className="text-center py-12 text-muted-foreground text-sm">
+          {filterMember ? `אין פריטים משויכים ל${filterMember}` : "עדיין אין פריטים ברשימה"}
+        </div>
       )}
 
       {/* Add form */}
-      {isAdmin && (
+      {isAdmin && !filterMember && (
         showAdd
-          ? <AddPackingItemForm tripId={tripId} onDone={() => setShowAdd(false)} />
+          ? <AddPackingItemForm tripId={tripId} onDone={() => setShowAdd(false)} members={members ?? []} />
           : <button onClick={() => setShowAdd(true)} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 py-1 px-1">
               <Plus className="w-3 h-3" /> הוסף פריט
             </button>
@@ -2196,7 +2437,7 @@ function PackingView({ tripId }: { tripId: string }) {
   );
 }
 
-function AddPackingItemForm({ tripId, onDone }: { tripId: string; onDone: () => void }) {
+function AddPackingItemForm({ tripId, onDone, members }: { tripId: string; onDone: () => void; members: Array<{ _id: Id<"familyMembers">; name: string; avatar?: string; color: string }> }) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("clothing");
   const [assignedTo, setAssignedTo] = useState("");
@@ -2212,7 +2453,7 @@ function AddPackingItemForm({ tripId, onDone }: { tripId: string; onDone: () => 
         tripId: tripId as Id<"trips">,
         name: name.trim(),
         category,
-        assignedTo: assignedTo.trim() || undefined,
+        assignedTo: assignedTo || undefined,
         quantity: Number(quantity) > 1 ? Number(quantity) : undefined,
       });
       setName(""); setAssignedTo(""); setQuantity("1");
@@ -2254,12 +2495,26 @@ function AddPackingItemForm({ tripId, onDone }: { tripId: string; onDone: () => 
               ))}
             </SelectContent>
           </Select>
-          <Input
-            placeholder="עבור מי?"
-            value={assignedTo}
-            onChange={(e) => setAssignedTo(e.target.value)}
-            className="flex-1 h-9 text-sm"
-          />
+          {members.length > 0 ? (
+            <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <SelectTrigger className="flex-1 h-9 text-sm">
+                <SelectValue placeholder="עבור מי?" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">כולם</SelectItem>
+                {members.map((m) => (
+                  <SelectItem key={m._id} value={m.name}>{m.avatar ?? ""} {m.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              placeholder="עבור מי?"
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              className="flex-1 h-9 text-sm"
+            />
+          )}
         </div>
         <div className="flex gap-2">
           <Button size="sm" className="h-8 text-xs rounded-lg bg-primary" onClick={handleSave} disabled={!name.trim() || saving}>

@@ -49,6 +49,16 @@ export const togglePacked = mutation({
   },
 });
 
+export const assign = mutation({
+  args: { id: v.id("packingItems"), assignedTo: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, { id, assignedTo }) => {
+    await requireAdmin(ctx);
+    await ctx.db.patch(id, { assignedTo });
+    return null;
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("packingItems") },
   returns: v.null(),
