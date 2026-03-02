@@ -52,9 +52,11 @@ function useOnlineStatus() {
 function useCountdown(targetDate: string, endDate?: string) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, isPast: false, isToday: false });
   useEffect(() => {
+    // Parse dates as local time (not UTC) by ensuring "T00:00:00" suffix
+    const toLocal = (d: string) => new Date(d.includes("T") ? d : d + "T00:00:00").getTime();
     const calc = () => {
       const now = new Date().getTime();
-      const target = new Date(targetDate).getTime();
+      const target = toLocal(targetDate);
       const diff = target - now;
       if (diff <= 0) {
         const tripEnd = endDate ? new Date(endDate + "T23:59:59").getTime() : 0;
@@ -77,7 +79,7 @@ function useCountdown(targetDate: string, endDate?: string) {
     calc();
     const timer = setInterval(calc, 1000);
     return () => clearInterval(timer);
-  }, [targetDate]);
+  }, [targetDate, endDate]);
   return timeLeft;
 }
 
@@ -161,29 +163,25 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
               </div>
             </div>
             {trip && !countdown.isPast && (
-              <div className="mt-3 bg-white/15 backdrop-blur-sm rounded-2xl p-3" data-testid="countdown-timer">
+              <div className="mt-2 bg-white/15 backdrop-blur-sm rounded-xl px-3 py-1.5" data-testid="countdown-timer">
                 {countdown.isToday ? (
-                  <div className="text-center">
-                    <p className="text-lg font-bold animate-pulse">🎉 הטיול התחיל!</p>
-                    <p className="text-[11px] opacity-90">תהנו מכל רגע בטיול!</p>
-                  </div>
+                  <p className="text-sm font-bold text-center animate-pulse">🎉 הטיול התחיל! תהנו!</p>
                 ) : (
-                  <>
-                    <p className="text-[10px] font-semibold text-center opacity-80 mb-1.5">⏳ ספירה לאחור לטיול</p>
-                    <div className="flex justify-center gap-2">
-                      {[
-                        { value: countdown.days, label: "ימים" },
-                        { value: countdown.hours, label: "שעות" },
-                        { value: countdown.minutes, label: "דקות" },
-                        { value: countdown.seconds, label: "שניות" },
-                      ].map((item) => (
-                        <div key={item.label} className="bg-white/20 rounded-xl px-2.5 py-1.5 min-w-[52px] text-center">
-                          <div className="text-lg font-bold tabular-nums leading-tight">{String(item.value).padStart(2, "0")}</div>
-                          <div className="text-[9px] font-medium opacity-80">{item.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span className="text-[10px] opacity-75 ml-1">⏳</span>
+                    {[
+                      { value: countdown.days, label: "ימ" },
+                      { value: countdown.hours, label: "שע" },
+                      { value: countdown.minutes, label: "דק" },
+                      { value: countdown.seconds, label: "שנ" },
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-baseline gap-0.5">
+                        <span className="text-base font-bold tabular-nums leading-none">{String(item.value).padStart(2, "0")}</span>
+                        <span className="text-[9px] opacity-70">{item.label}</span>
+                        {i < 3 && <span className="text-[10px] opacity-50 mr-0.5">:</span>}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}

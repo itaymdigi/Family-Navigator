@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "convex/react";
 import { useLocation } from "wouter";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../../convex/_generated/api";
-import { Loader2, Plus, MapPin, Calendar, LogOut } from "lucide-react";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { Loader2, Plus, MapPin, Calendar, LogOut, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,9 @@ export default function TripDashboard() {
   const currentUser = useQuery(api.users.me);
   const trips = useQuery(api.trips.list);
   const createTrip = useMutation(api.trips.create);
+  const deleteTrip = useMutation(api.trips.remove);
   const [showNew, setShowNew] = useState(false);
+  const [tripToDelete, setTripToDelete] = useState<Id<"trips"> | null>(null);
   const [form, setForm] = useState({
     name: "",
     destination: "",
@@ -96,13 +99,23 @@ export default function TripDashboard() {
         ) : (
           <div className="space-y-4">
             {trips.map((trip) => (
-              <button
+              <div
                 key={trip._id}
                 onClick={() => navigate(`/trips/${trip._id}`)}
-                className="w-full text-right bg-white rounded-2xl shadow-md hover:shadow-lg transition-all hover:scale-[1.01] overflow-hidden"
+                className="w-full text-right bg-white rounded-2xl shadow-md hover:shadow-lg transition-all hover:scale-[1.01] overflow-hidden cursor-pointer"
                 data-testid={`trip-card-${trip._id}`}
               >
-                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 px-6 py-5 text-white">
+                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 px-6 py-5 text-white relative">
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setTripToDelete(trip._id); }}
+                      className="absolute top-3 left-3 p-1.5 rounded-lg bg-white/15 hover:bg-red-500/70 transition-colors"
+                      title="מחק טיול"
+                      data-testid={`button-delete-trip-${trip._id}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-3xl">{trip.coverEmoji || "✈️"}</span>
                     <div>
@@ -129,11 +142,37 @@ export default function TripDashboard() {
                     <p className="text-sm text-gray-600 text-right">{trip.description}</p>
                   </div>
                 )}
-              </button>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      <Dialog open={!!tripToDelete} onOpenChange={(open) => { if (!open) setTripToDelete(null); }}>
+        <DialogContent className="max-w-[80vw] rounded-2xl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>מחיקת טיול</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 py-2">האם אתה בטוח שברצונך למחוק את הטיול? פעולה זו אינה ניתנת לביטול.</p>
+          <div className="flex gap-2 pt-1">
+            <Button
+              variant="destructive"
+              className="flex-1 h-10 rounded-xl"
+              onClick={async () => {
+                if (tripToDelete) {
+                  await deleteTrip({ id: tripToDelete });
+                  setTripToDelete(null);
+                }
+              }}
+            >
+              כן, מחק
+            </Button>
+            <Button variant="outline" className="flex-1 h-10 rounded-xl" onClick={() => setTripToDelete(null)}>
+              ביטול
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showNew} onOpenChange={setShowNew}>
         <DialogContent className="max-w-[90vw] rounded-2xl" dir="rtl">
