@@ -24,6 +24,7 @@ import type * as messages from "../messages.js";
 import type * as packingItems from "../packingItems.js";
 import type * as photos from "../photos.js";
 import type * as restaurants from "../restaurants.js";
+import type * as search from "../search.js";
 import type * as seed from "../seed.js";
 import type * as tips from "../tips.js";
 import type * as travelDocuments from "../travelDocuments.js";
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   packingItems: typeof packingItems;
   photos: typeof photos;
   restaurants: typeof restaurants;
+  search: typeof search;
   seed: typeof seed;
   tips: typeof tips;
   travelDocuments: typeof travelDocuments;

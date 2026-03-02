@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Plus, MapPin, Calendar as CalendarIcon, LogOut, Trash2, Users, Eye, EyeOff, ShieldCheck, UserRound, ChevronLeft, Loader2 } from "lucide-react";
+import { Plus, MapPin, Calendar as CalendarIcon, LogOut, Trash2, Users, Eye, EyeOff, ShieldCheck, UserRound, ChevronLeft, Loader2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ export default function TripDashboard() {
   const trips = useQuery(api.trips.list);
   const createTrip = useMutation(api.trips.create);
   const deleteTrip = useMutation(api.trips.remove);
+  const duplicateTrip = useMutation(api.trips.duplicate);
   const createUser = useAction(api.admin.createUser);
   const deleteUser = useMutation(api.admin.deleteUser);
   const [showNew, setShowNew] = useState(false);
@@ -40,6 +41,7 @@ export default function TripDashboard() {
     description: "",
   });
   const [saving, setSaving] = useState(false);
+  const [duplicating, setDuplicating] = useState<Id<"trips"> | null>(null);
 
   const [showStartCal, setShowStartCal] = useState(false);
   const [showEndCal, setShowEndCal] = useState(false);
@@ -201,14 +203,31 @@ export default function TripDashboard() {
           {/* Actions */}
           <div className="flex items-center gap-1 flex-shrink-0">
             {isAdmin && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setTripToDelete(trip._id); }}
-                className="size-8 flex items-center justify-center rounded-xl text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 transition-colors"
-                aria-label="מחק טיול"
-                data-testid={`button-delete-trip-${trip._id}`}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              <>
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    setDuplicating(trip._id);
+                    try { await duplicateTrip({ id: trip._id }); } finally { setDuplicating(null); }
+                  }}
+                  className="size-8 flex items-center justify-center rounded-xl text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-colors"
+                  aria-label="שכפל טיול"
+                  data-testid={`button-duplicate-trip-${trip._id}`}
+                  disabled={duplicating === trip._id}
+                >
+                  {duplicating === trip._id
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Copy className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setTripToDelete(trip._id); }}
+                  className="size-8 flex items-center justify-center rounded-xl text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  aria-label="מחק טיול"
+                  data-testid={`button-delete-trip-${trip._id}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
             )}
             <ChevronLeft className="w-4 h-4 text-muted-foreground/40" aria-hidden />
           </div>
