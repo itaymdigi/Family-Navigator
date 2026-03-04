@@ -42,10 +42,13 @@ export const tripSearch = query({
       return { days: [], attractions: [], restaurants: [], hotels: [], tips: [] };
     }
 
-    const days = await ctx.db
-      .query("tripDays")
-      .withIndex("by_trip", (qb) => qb.eq("tripId", tripId))
-      .collect();
+    // Fetch all data in parallel
+    const [days, allRestaurants, allHotels, allTips] = await Promise.all([
+      ctx.db.query("tripDays").withIndex("by_trip", (qb) => qb.eq("tripId", tripId)).collect(),
+      ctx.db.query("restaurants").withIndex("by_trip", (qb) => qb.eq("tripId", tripId)).collect(),
+      ctx.db.query("accommodations").withIndex("by_trip", (qb) => qb.eq("tripId", tripId)).collect(),
+      ctx.db.query("tips").withIndex("by_trip", (qb) => qb.eq("tripId", tripId)).collect(),
+    ]);
 
     const matchingDays = days
       .filter(
@@ -56,13 +59,20 @@ export const tripSearch = query({
       )
       .map((d) => ({ _id: d._id, dayNumber: d.dayNumber, title: d.title, date: d.date }));
 
+    // Fetch all attractions for all days in parallel (one query per day → parallel)
+    const attractionsByDay = await Promise.all(
+      days.map((day) =>
+        ctx.db
+          .query("attractions")
+          .withIndex("by_day", (qb) => qb.eq("dayId", day._id))
+          .collect()
+          .then((attrs) => ({ day, attrs }))
+      )
+    );
+
     const attractions: Array<{ _id: Id<"attractions">; name: string; description: string; dayNumber: number; dayTitle: string }> = [];
-    for (const day of days) {
-      const dayAttrs = await ctx.db
-        .query("attractions")
-        .withIndex("by_day", (qb) => qb.eq("dayId", day._id))
-        .collect();
-      for (const a of dayAttrs) {
+    for (const { day, attrs } of attractionsByDay) {
+      for (const a of attrs) {
         if (
           a.name.toLowerCase().includes(term) ||
           a.description.toLowerCase().includes(term) ||
@@ -72,21 +82,6 @@ export const tripSearch = query({
         }
       }
     }
-
-    const allRestaurants = await ctx.db
-      .query("restaurants")
-      .withIndex("by_trip", (qb) => qb.eq("tripId", tripId))
-      .collect();
-
-    const allHotels = await ctx.db
-      .query("accommodations")
-      .withIndex("by_trip", (qb) => qb.eq("tripId", tripId))
-      .collect();
-
-    const allTips = await ctx.db
-      .query("tips")
-      .withIndex("by_trip", (qb) => qb.eq("tripId", tripId))
-      .collect();
 
     return {
       days: matchingDays,
