@@ -232,7 +232,7 @@ export function PackingView({ tripId }: { tripId: string }) {
                     {isAdmin && (
                       <button
                         onClick={() => removeItem({ id: item._id })}
-                        className="opacity-0 group-hover:opacity-60 text-red-400 hover:text-red-600 transition-opacity p-0.5 flex-shrink-0"
+                        className="opacity-0 group-hover:opacity-60 text-red-400 hover:text-red-600 transition-opacity p-2 flex-shrink-0"
                         aria-label="מחק פריט"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -380,7 +380,7 @@ export function ChecklistView({ tripId }: { tripId: string }) {
         {isAdmin && (
           <button
             onClick={() => removeItem({ id: item._id })}
-            className="opacity-0 group-hover:opacity-60 text-red-400 hover:text-red-600 transition-opacity p-0.5"
+            className="opacity-0 group-hover:opacity-60 text-red-400 hover:text-red-600 transition-opacity p-2"
           >
             <Trash2 className="w-3 h-3" />
           </button>

@@ -190,7 +190,7 @@ export function RestaurantsView({ tripId }: { tripId: string }) {
                       <>
                         <button
                           onClick={() => updateRestaurant({ id: r._id, isVisited: !r.isVisited })}
-                          className={`p-1.5 rounded-lg transition-colors ${r.isVisited ? "bg-green-100 text-green-600" : "bg-gray-50 text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
+                          className={`p-2 rounded-lg transition-colors ${r.isVisited ? "bg-green-100 text-green-600" : "bg-gray-50 text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
                           data-testid={`button-toggle-visited-${r._id}`}
                         >
                           <Check className="w-3.5 h-3.5" />
@@ -212,12 +212,12 @@ export function RestaurantsView({ tripId }: { tripId: string }) {
                             });
                             setEditingId(r._id);
                           }}
-                          className="opacity-60 text-muted-foreground hover:text-primary p-1.5 transition-all"
+                          className="opacity-60 text-muted-foreground hover:text-primary p-2 transition-all"
                           data-testid={`button-edit-restaurant-${r._id}`}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => deleteRestaurant({ id: r._id })} className="opacity-60 text-red-400 hover:text-red-600 p-1.5 transition-all" data-testid={`button-delete-restaurant-${r._id}`}>
+                        <button onClick={() => deleteRestaurant({ id: r._id })} className="opacity-60 text-red-400 hover:text-red-600 p-2 transition-all" data-testid={`button-delete-restaurant-${r._id}`}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </>

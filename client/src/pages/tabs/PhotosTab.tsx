@@ -230,7 +230,7 @@ export function PhotosView({ tripId }: { tripId: string }) {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-60 transition-opacity duration-300 flex items-end justify-between p-3">
                   <span className="text-white text-xs font-semibold">{photo.caption}</span>
-                  {isAdmin && <button onClick={(e) => { e.stopPropagation(); deletePhoto({ id: photo._id }); }} className="text-white/80 hover:text-red-400 p-1" data-testid={`button-delete-photo-${photo._id}`}><Trash2 className="w-4 h-4" /></button>}
+                  {isAdmin && <button onClick={(e) => { e.stopPropagation(); deletePhoto({ id: photo._id }); }} className="text-white/80 hover:text-red-400 p-2" data-testid={`button-delete-photo-${photo._id}`}><Trash2 className="w-4 h-4" /></button>}
                 </div>
               </div>
             );

@@ -136,7 +136,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
                 {user?.role === "admin" && (
                   <button
                     onClick={toggleAdmin}
-                    className={`p-1.5 rounded-full transition-all ${isAdmin ? "bg-green-500/30 text-white" : "bg-white/15 text-white/70 hover:bg-white/25"}`}
+                    className={`p-2 rounded-full transition-all ${isAdmin ? "bg-green-500/30 text-white" : "bg-white/15 text-white/70 hover:bg-white/25"}`}
                     data-testid="button-toggle-admin"
                     title={isAdmin ? "מצב עריכה פעיל" : "כניסה למצב עריכה"}
                   >
@@ -145,7 +145,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
                 )}
                 <button
                   onClick={() => setShowSearch(true)}
-                  className="p-1.5 rounded-full bg-white/15 text-white/80 hover:bg-white/25 transition-all"
+                  className="p-2 rounded-full bg-white/15 text-white/80 hover:bg-white/25 transition-all"
                   data-testid="button-search"
                   aria-label="חיפוש בטיול"
                   title="חיפוש"
@@ -154,7 +154,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
                 </button>
                 <button
                   onClick={() => navigate("/")}
-                  className="p-1.5 rounded-full bg-white/15 text-white/80 hover:bg-white/25 transition-all"
+                  className="p-2 rounded-full bg-white/15 text-white/80 hover:bg-white/25 transition-all"
                   data-testid="button-home"
                   title="כל הטיולים"
                 >
@@ -162,7 +162,7 @@ export default function TripPlanner({ tripId }: { tripId: string }) {
                 </button>
                 <button
                   onClick={() => signOut()}
-                  className="p-1.5 rounded-full bg-white/15 text-white/70 hover:bg-red-500/30 hover:text-white transition-all"
+                  className="p-2 rounded-full bg-white/15 text-white/70 hover:bg-red-500/30 hover:text-white transition-all"
                   data-testid="button-logout"
                   title="התנתק"
                 >
@@ -391,7 +391,7 @@ function SearchModal({ tripId, onClose, onNavigate }: { tripId: string; onClose:
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
         {q && (
-          <button onClick={() => setQ("")} className="p-0.5 rounded-full text-muted-foreground hover:text-foreground">
+          <button onClick={() => setQ("")} className="p-2 rounded-full text-muted-foreground hover:text-foreground">
             <X className="w-4 h-4" />
           </button>
         )}

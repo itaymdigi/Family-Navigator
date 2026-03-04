@@ -108,6 +108,16 @@
 .text-fluid-2xl { font-size: clamp(1.25rem,  5vw,   1.5rem);   }
 .text-fluid-3xl { font-size: clamp(1.5rem,   6vw,   1.875rem); }
 
+/* ─── iOS zoom prevention ────────────────────────────────────────────── */
+/* iOS zooms the viewport on focus if input font-size < 16px */
+@media screen and (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* ─── App shell helpers ───────────────────────────────────────────────── */
 /* Full-height scrollable region that respects nav + status bar */
 .app-scroll {
